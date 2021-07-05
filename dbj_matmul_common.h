@@ -1,5 +1,5 @@
-/* 
- Started from systemd macro.h -- SPDX-License-Identifier: LGPL-2.1-or-later 
+/*
+ Started from systemd macro.h -- SPDX-License-Identifier: LGPL-2.1-or-later
 
  The rest (c) 2021 July by dbj~dbj.org -- https://dbj.org/license_dbj
 */
@@ -46,7 +46,7 @@
 #else
 #define assert_cc(expr)                                                        \
   struct CONCATENATE(_assert_struct_, __COUNTER__) {                           \
-    char x[(expr) ? 0 : -1];                                                   \
+	char x[(expr) ? 0 : -1];                                                   \
   }
 #endif
 
@@ -55,9 +55,9 @@
 #define _unused_ __attribute__((__unused__))
 #define _cleanup_(x) __attribute__((__cleanup__(x)))
 
-// DBJ 2021-JUL-05
-static inline void cleanup_free(void *p) {
-  free(*(void**) p);
+ // DBJ 2021-JUL-05
+static inline void cleanup_free(void* p) {
+	free(*(void**)p);
 }
 
 #define _printf_(a, b) __attribute__((__format__(printf, a, b)))
@@ -70,6 +70,10 @@ static inline void cleanup_free(void *p) {
 #define _section_(x) __attribute__((__section__(x)))
 #define _used_ __attribute__((__used__))
 #define _destructor_ __attribute__((__destructor__))
+
+// DBJ added 2021 JUL 05
+#define _constructor_ __attribute__((__constructor__))
+
 #define _deprecated_ __attribute__((__deprecated__))
 #define _packed_ __attribute__((__packed__))
 #define _malloc_ __attribute__((__malloc__))
@@ -97,50 +101,50 @@ static inline void cleanup_free(void *p) {
 #endif
 #endif
 
-/* Temporarily disable some warnings */
+ /* Temporarily disable some warnings */
 #define DISABLE_WARNING_DEPRECATED_DECLARATIONS                         \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
 
 #define DISABLE_WARNING_FORMAT_NONLITERAL                               \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wformat-nonliteral\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wformat-nonliteral\"")
 
 #define DISABLE_WARNING_MISSING_PROTOTYPES                              \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wmissing-prototypes\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wmissing-prototypes\"")
 
 #define DISABLE_WARNING_NONNULL                                         \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wnonnull\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wnonnull\"")
 
 #define DISABLE_WARNING_SHADOW                                          \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wshadow\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wshadow\"")
 
 #define DISABLE_WARNING_INCOMPATIBLE_POINTER_TYPES                      \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wincompatible-pointer-types\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wincompatible-pointer-types\"")
 
 #if HAVE_WSTRINGOP_TRUNCATION
 #  define DISABLE_WARNING_STRINGOP_TRUNCATION                           \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wstringop-truncation\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wstringop-truncation\"")
 #else
 #  define DISABLE_WARNING_STRINGOP_TRUNCATION                           \
-        _Pragma("GCC diagnostic push")
+		_Pragma("GCC diagnostic push")
 #endif
 
 #define DISABLE_WARNING_FLOAT_EQUAL \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wfloat-equal\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wfloat-equal\"")
 
 #define DISABLE_WARNING_TYPE_LIMITS \
-        _Pragma("GCC diagnostic push");                                 \
-        _Pragma("GCC diagnostic ignored \"-Wtype-limits\"")
+		_Pragma("GCC diagnostic push");                                 \
+		_Pragma("GCC diagnostic ignored \"-Wtype-limits\"")
 
 #define REENABLE_WARNING                                                \
-        _Pragma("GCC diagnostic pop")
+		_Pragma("GCC diagnostic pop")
 
 
 #define XSTRINGIFY(x) #x
@@ -148,10 +152,10 @@ static inline void cleanup_free(void *p) {
 
 
 #define SWAP_TWO(x, y) do {                        \
-                typeof(x) _t = (x);                \
-                (x) = (y);                         \
-                (y) = (_t);                        \
-        } while (false)
+				typeof(x) _t = (x);                \
+				(x) = (y);                         \
+				(y) = (_t);                        \
+		} while (false)
 
 #define STRV_MAKE(...) ((char**) ((const char*[]) { __VA_ARGS__, NULL }))
 #define STRV_MAKE_EMPTY ((char*[1]) { NULL })
@@ -163,9 +167,9 @@ static inline void cleanup_free(void *p) {
  * allowed to remove our local copies of the variables. We want this to work for unaligned memory, hence
  * memcpy() is great for our purposes. */
 #define READ_NOW(x)                                                     \
-        ({                                                              \
-                typeof(x) _copy;                                        \
-                memcpy(&_copy, &(x), sizeof(_copy));                    \
-                asm volatile ("" : : : "memory");                       \
-                _copy;                                                  \
-        })
+		({                                                              \
+				typeof(x) _copy;                                        \
+				memcpy(&_copy, &(x), sizeof(_copy));                    \
+				asm volatile ("" : : : "memory");                       \
+				_copy;                                                  \
+		})
