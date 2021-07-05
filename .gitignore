@@ -1,6 +1,9 @@
 
-
-./out
+.vs
+x64
+out
+*.filters
+*.user
 *.exe
 *.pdb
 *.ilk
