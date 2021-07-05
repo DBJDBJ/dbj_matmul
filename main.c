@@ -2,28 +2,10 @@
 #define DBJ_MATMUL_IMPLEMENTATION
 #include "dbj_matmul.h"
 
+#define DBJ_MATMUL_OMP_IMP
+#include "dbj_matmul_omp.h"
+
 #include "ubench.h/ubench.h"
-
-#if 0
-
-#include <time.h>
-#include <omp.h>
-
-#define MATMUL_PRINT(...) fprintf( stderr, ## __VA_ARGS__ )
-
-/* Prints vector, or matrix. */
-_const_ static
-void print(const double* a, const unsigned n_rows_a, const unsigned n_cols_a) {
-	for (unsigned i = 0; i < n_rows_a; i++) {
-		for (unsigned j = 0; j < n_cols_a; j++) {
-			MATMUL_PRINT("%8.3f ", a[i * n_cols_a + j]);
-		}
-		MATMUL_PRINT("\n");
-	}
-	MATMUL_PRINT("\n");
-}
-
-#endif // 0
 
 //////////////////////////////////////////////////////////////////
 // ubench bench functions have no parameters
@@ -94,34 +76,16 @@ UBENCH(dbj_matmul, dot_faster) {
 	free(app_data.d);
 }
 
-UBENCH_MAIN();
-
-#if 0
-int main(int argc, char* argv[]) {
-	(void)(argc);
-	(void)(argv);
-	/* Intializes random number generator */
-	time_t t;
-	srand((unsigned)time(&t));
-	srand(0);
-
-	/* For measuring time */
-	double t0, t1;
-
-	t0 = omp_get_wtime();
-	app_data.c = dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	t1 = omp_get_wtime();
-	MATMUL_PRINT("Dot Simple: Elapsed time %.3f s\n", t1 - t0);
-
-	t0 = omp_get_wtime();
-	app_data.d = dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	t1 = omp_get_wtime();
-	MATMUL_PRINT("Dot: Elapsed time %.3f s\n", t1 - t0);
-
-#ifdef WIN32
-	system("pause");
-#endif
-	return EXIT_SUCCESS;
+UBENCH(dbj_matmul, omp_dot_simple) {
+	app_data.c = omp_dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
+	free(app_data.c);
 }
 
-#endif // 0
+UBENCH(dbj_matmul, omp_dot_faster) {
+	app_data.d = omp_dot_faster(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
+	free(app_data.d);
+}
+
+UBENCH_MAIN();
+
+
