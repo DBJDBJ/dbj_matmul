@@ -3,6 +3,10 @@
 
 Parallel and Sequential versions of Matrix Multiplication of non-square matrices.
 
+Inspiration: https://github.com/ivanbgd/Matrix-Multiplication-MatMul-C
+The rest: (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj
+
+
 ## Building
 
 ### DEVENV
@@ -26,4 +30,4 @@ VS Code does not recognise clang-cl (as of 2021 July) | so one can not just hit 
 
 | Part | Comment
 |------|-----------
-|`macro,h` and `macro-fundamental,h` | nicked from `systemd` GitHub repository. Refactored.
+|`macro.h` and `macro-fundamental.h` | nicked from `systemd` GitHub repository. Refactored.
