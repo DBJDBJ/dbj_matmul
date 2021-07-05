@@ -2,6 +2,10 @@
 #define DBJ_MATMUL_IMPLEMENTATION
 #include "dbj_matmul.h"
 
+#include "ubench.h/ubench.h"
+
+#if 0
+
 #include <time.h>
 #include <omp.h>
 
@@ -19,11 +23,14 @@ void print(const double* a, const unsigned n_rows_a, const unsigned n_cols_a) {
 	MATMUL_PRINT("\n");
 }
 
-//////////////////////////////////////////////////////////////////
-/// ubench function have no parameters
-/// thus we use common data aka globals
+#endif // 0
 
-#define SCALE 400U
+//////////////////////////////////////////////////////////////////
+// ubench bench functions have no parameters
+// thus we use common data aka globals
+
+#define SCALE 10U
+// #define SCALE 400U
 
 static struct app_data_type {
 
@@ -64,6 +71,8 @@ static void app_start(void)
 
 		init_seq(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
 		init_seq(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
+
+		system(" "); // WIN32 hack to kick-start the ANSI ESC codes interpreter
 	}
 
 	app_data.start_counter += 1;
@@ -73,11 +82,21 @@ static void app_end(void)
 {
 	free(app_data.a);
 	free(app_data.b);
+}
+
+UBENCH(dbj_matmul, dot_simple) {
+	app_data.c = dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
 	free(app_data.c);
+}
+
+UBENCH(dbj_matmul, dot_faster) {
+	app_data.d = dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
 	free(app_data.d);
 }
 
+UBENCH_MAIN();
 
+#if 0
 int main(int argc, char* argv[]) {
 	(void)(argc);
 	(void)(argv);
@@ -105,3 +124,4 @@ int main(int argc, char* argv[]) {
 	return EXIT_SUCCESS;
 }
 
+#endif // 0
