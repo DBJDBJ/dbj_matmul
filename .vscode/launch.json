@@ -5,7 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(Windows) Launch",
+            "name": "F5 Debugging",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${fileDirname}\\${fileBasenameNoExtension}.exe",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "externalTerminal",
+            "preLaunchTask": "F5 clang.exe build active file"
+        },
+        {
+            "name": "out/test.exe debug",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/out/test.exe",
