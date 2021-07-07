@@ -46,8 +46,8 @@ struct {\
 do { \
 assert(N_ == NULL) ; \
 DBJ_MATRIX_STRUCT(T_) * retval = NULL; \
-	if( R_ < DBJ_SANITY_MAX_ROW_COUNT) \
-	if( C_ < DBJ_SANITY_MAX_COL_COUNT) \
+	if(   ( R_ < DBJ_SANITY_MAX_ROW_COUNT) \
+	   && ( C_ < DBJ_SANITY_MAX_COL_COUNT)) \
     { \
 	 retval = calloc(1, DBJ_MATRIX_STRUCT_SIZE(T_,R_,C_) ) ; \
 	 if (retval) { \

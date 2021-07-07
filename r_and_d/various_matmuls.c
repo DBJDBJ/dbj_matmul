@@ -25,7 +25,8 @@ DBJ_API float_matrix_struct* new_float_matrix(const unsigned n_rows, const unsig
 	DBJ_MATRIX_NEW(retval, float, n_rows, n_cols);
 
 	if (!retval) {
-		perror(__FILE__);
+		fprintf(stderr, "\n%s(%d) DBJ_MATRIX_NEW failed?\n", __FILE__, __LINE__);
+		perror(" ");
 		exit(1);
 	}
 	return retval;

@@ -24,6 +24,9 @@ clang-cl /openmp /TC /MDd /Zi main.c /o out/test.exe
 @del out\*.pdb
 @del out\*.ilk
 @del out\*.exe
+@del r_and_d\*.pdb
+@del r_and_d\*.ilk
+@del r_and_d\*.exe
 @goto exit
 
 :exit
