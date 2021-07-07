@@ -86,6 +86,15 @@ UBENCH(dbj_matmul, omp_dot_faster) {
 	free(app_data.d);
 }
 
-UBENCH_MAIN();
+
+UBENCH_STATE();
+
+extern int various_matmuls(const int, const char**);
+
+int main(const int argc, const char** argv)
+{
+	return various_matmuls(argc, argv);
+	// return ubench_main(argc, argv);
+}
 
 
