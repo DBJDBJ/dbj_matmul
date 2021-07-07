@@ -143,27 +143,40 @@ DBJ_API void* mat_mul_0(
 	return m;
 }
 
-#if 0
-
-DBJ_API float** mat_mul1(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, float* const* b)
+DBJ_API void* mat_mul_1(
+	const unsigned n_a_rows,
+	const unsigned n_a_cols,
+	const unsigned n_b_cols,
+	float a[static n_a_rows][n_a_cols],
+	float b[static n_a_rows][n_b_cols],
+	float m[static n_a_rows][n_b_cols]
+)
 {
-	int i, j, k, n_b_rows = n_a_cols;
-	float** m, ** bT;
-	m = mat_init(n_a_rows, n_b_cols);
-	bT = mat_transpose(n_b_rows, n_b_cols, b);
-	for (i = 0; i < n_a_rows; ++i) {
+	const unsigned n_b_rows = n_a_cols;
+	// Temp rows and cols are inverted
+	float_matrix_struct* Temp = new_float_matrix(n_b_cols, n_b_rows);
+	DBJ_MATRIX_ALIAS(matrix, float, n_b_rows);
+	DBJ_MATRIX_CAST(bT, matrix, Temp);
+	(void)mat_transpose(n_b_rows, n_b_cols, b, bT);
+
+	for (unsigned i = 0; i < n_a_rows; ++i) {
 		const float* ai = a[i];
 		float* mi = m[i];
-		for (j = 0; j < n_b_cols; ++j) {
+		for (unsigned j = 0; j < n_b_cols; ++j) {
 			float t = 0.0f, * bTj = bT[j];
-			for (k = 0; k < n_a_cols; ++k)
+			for (unsigned k = 0; k < n_a_cols; ++k)
 				t += ai[k] * bTj[k];
 			mi[j] = t;
 		}
 	}
-	mat_destroy(bT);
+
+	free(Temp);
+
 	return m;
 }
+/////////////////////////////////////////////////////////////////////////////////////
+#if 0
+/////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __SSE__
 DBJ_API float** mat_mul2(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, float* const* b)
@@ -292,13 +305,17 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, cons
 			mx_A, mx_B, mx_M
 		);
 
-		// mx_struct_M = mat_mul_0(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
 	}
+	if (algo == 1) {
+		(void)mat_mul_1(
+			matrix_side_length, matrix_side_length, matrix_side_length,
+			mx_A, mx_B, mx_M
+		);
+	}
+	///////////////////////////////////////////////
 #if 0
-	else if (algo == 1) {
-		mx_struct_M = mat_mul1(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
+///////////////////////////////////////////////
 #ifdef __SSE__
-	}
 	else if (algo == 2) {
 		mx_struct_M = mat_mul2(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
 	}
@@ -324,7 +341,9 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, cons
 		fprintf(stderr, "SKIPPING: unknown algorithm %d\rows_cols", algo);
 		goto matmul_exit;
 	}
+	//////////////////////////////////////////////
 #endif // 0
+///////////////////////////////////////////////
 
 	fprintf(stderr, "\nAlgorithm %-36s: ", algo_name);
 	fprintf(stderr, "CPU time: %2.3g sec", (double)(clock() - start_time_) / CLOCKS_PER_SEC);
