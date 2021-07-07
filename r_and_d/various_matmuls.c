@@ -89,11 +89,14 @@ typedef DBJ_MATRIX_STRUCT(float) float_matrix_struct;
 
 DBJ_API float_matrix_struct* new_float_matrix(const unsigned n_rows, const unsigned  n_cols)
 {
-	float_matrix_struct* retval = NULL; // must be init to NULL
+	// float_matrix_struct* retval = NULL; // must be init to NULL
 
-	DBJ_MATRIX_NEW(retval, float, n_rows, n_cols);
-
-	if (!retval) {
+	float_matrix_struct* retval = DBJ_MATRIX_ALLOC(n_rows, n_cols, sizeof(float));
+	if (retval) {
+		retval->rows = n_rows;
+		retval->cols = n_cols;
+	}
+	else {
 		fprintf(stderr, "\n%s(%d) DBJ_MATRIX_NEW failed?\n", __FILE__, __LINE__);
 		perror(" ");
 		exit(1);

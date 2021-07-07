@@ -41,20 +41,22 @@ struct {\
 #define DBJ_MATRIX_STRUCT_SIZE( T_,R_,C_) \
 (sizeof( DBJ_MATRIX_STRUCT(T_) ) + sizeof( T_[R_ * C_] ))
 
+static inline void* DBJ_MATRIX_ALLOC
+(const unsigned rows_, const unsigned cols_, size_t type_size_)
+{
+	if (rows_ > DBJ_SANITY_MAX_ROW_COUNT) return NULL;
+	if (cols_ > DBJ_SANITY_MAX_COL_COUNT) return NULL;
+	return calloc(rows_ * cols_, type_size_);
+}
 
 #define DBJ_MATRIX_NEW(N_,T_,R_,C_) \
 do { \
 assert(N_ == NULL) ; \
-DBJ_MATRIX_STRUCT(T_) * retval = NULL; \
-	if(   ( R_ < DBJ_SANITY_MAX_ROW_COUNT) \
-	   && ( C_ < DBJ_SANITY_MAX_COL_COUNT)) \
-    { \
-	 retval = calloc(1, DBJ_MATRIX_STRUCT_SIZE(T_,R_,C_) ) ; \
+DBJ_MATRIX_STRUCT(T_) * retval = DBJ_MATRIX_ALLOC(R_,C_, sizeof(T_)); \
 	 if (retval) { \
 		 retval->rows = R_ ; \
 		 retval->cols = C_ ; \
 	 } ; \
-    } ; \
 	 N_ = retval ; \
 } while(0)
 
