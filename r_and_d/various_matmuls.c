@@ -8,89 +8,26 @@
 #include <intrin.h> // #define __SSE__ 1
 
 #include "pseudo_random.h"
-
+#include "dbj_matrix.h"
 
 #define DBJ_API static
 
-#define SANITY_MAX_ROW_COUNT 0xFFFF
-#define SANITY_MAX_COL_COUNT 0xFFFF
-
-
-
-/*
- Helper routines for matrix manipulation
-*/
-
-#define MATRIC_HANDLE void *
-
-// usage: typedef MATRIX_STRUCT(char) char_matrix ;
-#define MATRIX_STRUCT(T_) \
-struct {\
-	unsigned rows;\
-	unsigned cols;\
-	T_ data[];\
-}
-
-// #define MATRIX_DATA_TYPE(M_) __typeof__(M_->data)
-
-#define MATRIX_STRUCT_SIZE( T_,R_,C_) \
-(sizeof( MATRIX_STRUCT(T_) ) + sizeof( T_[R_ * C_] ))
-
-/*
-usage:
-
-char_matrix * char_matrix_struct_pointer = NULL ;
-
-MATRIX_NEW( char_matrix_struct_pointer, rows , cols ) ;
-
-assert(char_matrix_struct_pointer) ;
-
-*/
-
-#define MATRIX_NEW(N_,T_,R_,C_) \
-do { \
-	assert( R_ < SANITY_MAX_ROW_COUNT); \
-	assert( C_ < SANITY_MAX_COL_COUNT); \
-	 MATRIX_STRUCT(T_) retval = \
-	 calloc(1, MATRIX_STRUCT_SIZE(T_,R_,C_) ) ; \
-	 if (retval) { \
-		 retval->rows = R_ ; \
-		 retval->cols = C_ ; \
-	 } ; \
-	 N_ = retval ; \
-} while(0)
-
-#define MATRIX_FREE(M_) do { assert(M_); free(M_); M_ = NULL; } while(0)
-
-#define MATRIX_DATA_POINTER(T_, M_) (T_(*)[M_->rows][M_->cols])M_->data
-
-// matrix type is used with [][]
-#define MATRIX_TYPE(T_, C_) T_(*)[C]
-#define MATRIX_ALIAS(N_,T_,C_) \
-  typedef T_(*N_)[C_]
-
-// MS_ is matrix struct pointer
-// usage: MATRIX_TYPE(mx_struct_pointer) mx = MATRIX_CAST(mx_struct_pointer)
-// #define MATRIX_CAST(T_, M_) (T_)MATRIX_DATA_POINTER(T_,M_)
-#define MATRIX_CAST(N_,A_, M_) A_ N_ = (A_)(M_->data)
-
 //////////////////////////////////////////////////////////////////////
 
-typedef MATRIX_STRUCT(float) float_matrix_struct;
+typedef DBJ_MATRIX_STRUCT(float) float_matrix_struct;
 
 //////////////////////////////////////////////////////////////////////
 
 DBJ_API float_matrix_struct* new_float_matrix(const unsigned n_rows, const unsigned  n_cols)
 {
-	assert(n_rows < SANITY_MAX_ROW_COUNT);
-	assert(n_cols < SANITY_MAX_COL_COUNT);
+	float_matrix_struct* retval = NULL; // must be init to NULL
 
-	float_matrix_struct* retval = calloc(1, sizeof(float_matrix_struct) + sizeof(float[n_rows * n_cols]));
-	assert(retval);
-	if (retval) {
-		retval->rows = n_rows;
-		retval->cols = n_cols;
-	};
+	DBJ_MATRIX_NEW(retval, float, n_rows, n_cols);
+
+	if (!retval) {
+		perror(__FILE__);
+		exit(1);
+	}
 	return retval;
 }
 
@@ -101,12 +38,8 @@ DBJ_API float_matrix_struct* mat_gen_random(const unsigned n_rows, const unsigne
 {
 	float_matrix_struct* fmt_pointer = new_float_matrix(n_rows, n_cols);
 
-	//typedef typeof(fmt_pointer->data[0])(*mx_type)[fmt_pointer->cols];
-
-	//mx_type mx = (mx_type)(fmt_pointer->data);
-
-	MATRIX_ALIAS(matrix, float, n_cols);
-	MATRIX_CAST(mx, matrix, fmt_pointer);
+	DBJ_MATRIX_ALIAS(matrix, float, n_cols);
+	DBJ_MATRIX_CAST(mx, matrix, fmt_pointer);
 
 	for (unsigned i = 0; i < n_rows; ++i)
 		for (unsigned j = 0; j < n_cols; ++j)
@@ -189,15 +122,6 @@ DBJ_API float sdot_sse(int n, const float x[static n], const float y[static n])
 	   compiler, OS and hardware
 
  */
-
-DBJ_API void* mat_mul_0(
-	const unsigned n_a_rows,
-	const unsigned n_a_cols,
-	const unsigned n_b_cols,
-	float a[n_a_rows][n_a_cols],
-	float b[n_a_rows][n_b_cols],
-	float m[n_a_rows][n_b_cols]
-);
 
 DBJ_API void* mat_mul_0(
 	const unsigned n_a_rows,
@@ -342,7 +266,7 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, cons
 
 	assert(algo_name);
 
-	MATRIX_ALIAS(matrix, float, matrix_side_length);
+	DBJ_MATRIX_ALIAS(matrix, float, matrix_side_length);
 
 	float_matrix_struct* mx_struct_A = NULL, * mx_struct_B = NULL, * mx_struct_M = NULL;
 
@@ -355,9 +279,9 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, cons
 
 	mx_struct_M = new_float_matrix(matrix_side_length, matrix_side_length);
 
-	MATRIX_CAST(mx_A, matrix, mx_struct_A);
-	MATRIX_CAST(mx_B, matrix, mx_struct_B);
-	MATRIX_CAST(mx_M, matrix, mx_struct_M);
+	DBJ_MATRIX_CAST(mx_A, matrix, mx_struct_A);
+	DBJ_MATRIX_CAST(mx_B, matrix, mx_struct_B);
+	DBJ_MATRIX_CAST(mx_M, matrix, mx_struct_M);
 
 
 	clock_t start_time_ = clock();
@@ -457,7 +381,7 @@ int various_matmuls(const int argc, const char** argv)
 	(void)argc;
 	(void)argv;
 	//float_matrix_struct* fmtp = mat_gen_random(3, 4);
-	//MATRIX_FREE(fmtp);
+	//DBJ_MATRIX_FREE(fmtp);
 	test_various_matmuls(0xF, 0xF);
 	return 42;
 }
