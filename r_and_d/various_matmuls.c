@@ -89,26 +89,50 @@ DBJ_API void* mat_mul_4(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/
 	float a[ /*n_a_rows*/][* /*n_a_cols*/], float b[ /*n_a_rows*/][* /*n_b_cols*/], float m[ /*n_a_rows*/][* /*n_b_cols*/]
 );
 
+#if __SSE__
+
+DBJ_API void* mat_mul_2(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
+	float a[ /*n_a_rows*/][* /*n_a_cols*/], float b[ /*n_a_rows*/][* /*n_b_cols*/], float m[ /*n_a_rows*/][* /*n_b_cols*/]
+);
+
+DBJ_API void* mat_mul_7(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
+	float a[ /*n_a_rows*/][* /*n_a_cols*/], float b[ /*n_a_rows*/][* /*n_b_cols*/], float m[ /*n_a_rows*/][* /*n_b_cols*/]
+);
+
+#ifdef HAVE_CBLAS
+DBJ_API void* mat_mul_5(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
+	float a[ /*n_a_rows*/][* /*n_a_cols*/], float b[ /*n_a_rows*/][* /*n_b_cols*/], float m[ /*n_a_rows*/][* /*n_b_cols*/]
+);
+
+DBJ_API void* mat_mul_6(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
+	float a[ /*n_a_rows*/][* /*n_a_cols*/], float b[ /*n_a_rows*/][* /*n_b_cols*/], float m[ /*n_a_rows*/][* /*n_b_cols*/]
+);
+#endif // HAVE_CBLAS
+
+
+#endif // __SSE__
+
+
 const description_function_pair algo_table[] =
 {
 DF_PAIR("0: naive - no optimization" , mat_mul_0) ,
 DF_PAIR("1: transposing the second matrix" , mat_mul_1) ,
 #if __SSE__
-DF_PAIR("2: explicitly vectorized sdot() with SSE" , mat_mul_0) ,
+DF_PAIR("2: explicitly vectorized sdot() with SSE" , mat_mul_2) ,
 #else
 DF_PAIR("2: explicitly vectorized sdot() with SSE not implemented" , mat_mul_null) ,
 #endif // ! __SSE__
 DF_PAIR("3: implicitly vectorized sdot()" , mat_mul_3) ,
 DF_PAIR("4: no vectorization hints", mat_mul_4) ,
 #ifdef HAVE_CBLAS
-DF_PAIR("5: with sdot() from an external CBLAS library" , mat_mul_0) ,
-DF_PAIR("6: with sgemm() from an external CBLAS library", mat_mul_0) ,
+DF_PAIR("5: with sdot() from an external CBLAS library" , mat_mul_5) ,
+DF_PAIR("6: with sgemm() from an external CBLAS library", mat_mul_6) ,
 #else
 DF_PAIR("5: with sdot() from CBLAS library not implemented " , mat_mul_null) ,
 DF_PAIR("6: with sgemm() from CBLAS library not implemented ", mat_mul_null) ,
 #endif // ! HAVE_CBLAS
 #if __SSE__
-DF_PAIR("7: explicitly SSE sdot() plus loop tiling", mat_mul_0)
+DF_PAIR("7: explicitly SSE sdot() plus loop tiling", mat_mul_7)
 #else
 DF_PAIR("7: explicitly SSE sdot() plus loop tiling not implemented" , mat_mul_null) ,
 #endif // ! __SSE__
@@ -272,45 +296,53 @@ DBJ_API void* mat_mul_1(
 	return m;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-#if 0
-/////////////////////////////////////////////////////////////////////////////////////
-
 #ifdef __SSE__
-DBJ_API float** mat_mul2(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, float* const* b)
+
+DBJ_API void* mat_mul_2(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	float a[static n_a_rows][n_a_cols], float b[static n_a_rows][n_b_cols], float m[static n_a_rows][n_b_cols]
+)
 {
-	int i, j, n_b_rows = n_a_cols;
-	float** m, ** bT;
-	m = mat_init(n_a_rows, n_b_cols);
-	bT = mat_transpose(n_b_rows, n_b_cols, b);
-	for (i = 0; i < n_a_rows; ++i)
-		for (j = 0; j < n_b_cols; ++j)
+	const unsigned n_b_rows = n_a_cols;
+
+	float_matrix_struct* Temp = new_float_matrix(n_b_cols, n_b_rows);
+	DBJ_MATRIX_ALIAS(matrix, float, n_b_rows);
+	DBJ_MATRIX_CAST(bT, matrix, Temp);
+	(void)mat_transpose(n_b_rows, n_b_cols, b, bT);
+
+	for (unsigned i = 0; i < n_a_rows; ++i)
+		for (unsigned j = 0; j < n_b_cols; ++j)
 			m[i][j] = sdot_sse(n_a_cols, a[i], bT[j]);
-	mat_destroy(bT);
+	free(Temp);
 	return m;
 }
-DBJ_API float** mat_mul7(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, float* const* b)
+
+DBJ_API void* mat_mul_7(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	float a[static n_a_rows][n_a_cols], float b[static n_a_rows][n_b_cols], float m[static n_a_rows][n_b_cols]
+)
 {
-	int i, j, ii, jj, x = 16, n_b_rows = n_a_cols;
-	float** m, ** bT;
-	m = mat_init(n_a_rows, n_b_cols);
-	bT = mat_transpose(n_b_rows, n_b_cols, b);
-	for (i = 0; i < n_a_rows; i += x) {
-		for (j = 0; j < n_b_cols; j += x) {
+	const unsigned x = 16, n_b_rows = n_a_cols;
+
+	float_matrix_struct* Temp = new_float_matrix(n_b_cols, n_b_rows);
+	DBJ_MATRIX_ALIAS(matrix, float, n_b_rows);
+	DBJ_MATRIX_CAST(bT, matrix, Temp);
+	(void)mat_transpose(n_b_rows, n_b_cols, b, bT);
+
+	for (unsigned i = 0; i < n_a_rows; i += x) {
+		for (unsigned j = 0; j < n_b_cols; j += x) {
 			int je = n_b_cols < j + x ? n_b_cols : j + x;
 			int ie = n_a_rows < i + x ? n_a_rows : i + x;
-			for (ii = i; ii < ie; ++ii)
-				for (jj = j; jj < je; ++jj)
+			for (unsigned ii = i; ii < ie; ++ii)
+				for (unsigned jj = j; jj < je; ++jj)
 					m[ii][jj] += sdot_sse(n_a_cols, a[ii], bT[jj]);
 		}
 	}
-	mat_destroy(bT);
+	free(Temp);
 	return m;
 }
 #endif // __SSE__
 
-/////////////////////////////////////////////////////////////////////////////////////
-#endif // 0
 /////////////////////////////////////////////////////////////////////////////////////
 
 DBJ_API void* mat_mul_3(
@@ -353,23 +385,30 @@ DBJ_API void* mat_mul_4(
 
 #ifdef HAVE_CBLAS
 
-DBJ_API float** mat_mul5(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, float* const* b)
+DBJ_API void* mat_mul_5(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	float a[static n_a_rows][n_a_cols], float b[static n_a_rows][n_b_cols], float m[static n_a_rows][n_b_cols]
+)
 {
-	int i, j, n_b_rows = n_a_cols;
-	float** m, ** bT;
-	m = mat_init(n_a_rows, n_b_cols);
-	bT = mat_transpose(n_b_rows, n_b_cols, b);
-	for (i = 0; i < n_a_rows; ++i)
-		for (j = 0; j < n_b_cols; ++j)
-			m[i][j] = cblas_sdot(n_a_cols, a[i], 1, bT[j], 1);
-	mat_destroy(bT);
+	const unsigned n_b_rows = n_a_cols;
+
+	float_matrix_struct* Temp = new_float_matrix(n_b_cols, n_b_rows);
+	DBJ_MATRIX_ALIAS(matrix, float, n_b_rows);
+	DBJ_MATRIX_CAST(bT, matrix, Temp);
+	(void)mat_transpose(n_b_rows, n_b_cols, b, bT);
+
+	for (unsigned i = 0; i < n_a_rows; ++i)
+		for (unsigned j = 0; j < n_b_cols; ++j)
+			m[i][j] = cblas_sdot(n_a_cols, a[i], 1, bT[j], 1); // clas_sdot() ???
+	free(Temp);
 	return m;
 }
 
-DBJ_API** mat_mul6(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, float* const* b)
+DBJ_API void* mat_mul_6(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	float a[static n_a_rows][n_a_cols], float b[static n_a_rows][n_b_cols], float m[static n_a_rows][n_b_cols]
+)
 {
-	float** m, n_b_rows = n_a_cols;
-	m = mat_init(n_a_rows, n_b_cols);
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n_a_rows, n_b_cols, n_a_cols, 1.0f, a[0], n_a_rows, b[0], n_b_rows, 0.0f, m[0], n_a_rows);
 	return m;
 }
@@ -419,48 +458,15 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, desc
 		mx_A, mx_B, mx_M
 	);
 
-	///////////////////////////////////////////////
-#if 0
-///////////////////////////////////////////////
-#ifdef __SSE__
-	else if (algo == 2) {
-	mx_struct_M = mat_mul2(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
-	}
-	else if (algo == 7) {
-	mx_struct_M = mat_mul7(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
-#endif
-	}
-	else if (algo == 3) {
-	mx_struct_M = mat_mul3(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
-	}
-	else if (algo == 4) {
-	mx_struct_M = mat_mul4(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
-#ifdef HAVE_CBLAS
-	}
-	else if (algo == 5) {
-	mx_struct_M = mat_mul5(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
-	}
-	else if (algo == 6) {
-	mx_struct_M = mat_mul6(matrix_side_length, matrix_side_length, mx_struct_A, matrix_side_length, mx_struct_B);
-#endif
-	}
-	else {
-	fprintf(stderr, "SKIPPING: unknown algorithm %d\rows_cols", algo);
-	goto matmul_exit;
-	}
-	//////////////////////////////////////////////
-#endif // 0
-///////////////////////////////////////////////
+	fprintf(stderr, "\nAlgorithm %-36s: ", algo_name);
+	fprintf(stderr, "\nCPU time: %2.3g sec", (double)(clock() - start_time_) / CLOCKS_PER_SEC);
+	// fprintf(stderr, "\nCentral cell: %g", mx_M[matrix_side_length / 2][matrix_side_length / 2]);
 
-fprintf(stderr, "\nAlgorithm %-36s: ", algo_name);
-fprintf(stderr, "\nCPU time: %2.3g sec", (double)(clock() - start_time_) / CLOCKS_PER_SEC);
-fprintf(stderr, "\nCentral cell: %g", mx_M[matrix_side_length / 2][matrix_side_length / 2]);
+	if (mx_struct_M) free(mx_struct_M);
+	if (mx_struct_A) free(mx_struct_A);
+	if (mx_struct_B) free(mx_struct_B);
 
-if (mx_struct_M) free(mx_struct_M);
-if (mx_struct_A) free(mx_struct_A);
-if (mx_struct_B) free(mx_struct_B);
-
-return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
 static void test_various_matmuls(
