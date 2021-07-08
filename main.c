@@ -45,9 +45,6 @@ DBJ_API void app_start(void)
 	ALLOC_WITH_POLICY(app_data.b, app_data.n_rows_b * app_data.n_cols_b * sizeof(*app_data.b));
 	ALLOC_WITH_POLICY(app_data.rezult, app_data.n_rows_a * app_data.n_cols_b * sizeof(*app_data.rezult));
 
-	//init_rand(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
-	//init_rand(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-
 	init_seq(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
 	init_seq(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
 	init_seq(app_data.rezult, app_data.n_rows_a, app_data.n_cols_b);
@@ -68,6 +65,7 @@ UBENCH(dbj_, faster) {
 	dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
+#if 0
 UBENCH(dbj_, omp_simple) {
 	omp_dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
@@ -75,11 +73,9 @@ UBENCH(dbj_, omp_simple) {
 UBENCH(dbj_, omp_faster) {
 	omp_dot_faster(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
-
+#endif // 0
 
 UBENCH_STATE();
-
-// extern int various_matmuls(const int, const char**);
 
 int main(const int argc, const char** argv)
 {

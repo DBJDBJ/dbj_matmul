@@ -25,7 +25,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\main.c" />
-    <ClCompile Include="..\r_and_d\various_matmuls.c" />
     <ClCompile Include="..\r_and_d\various_simple_matmuls.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

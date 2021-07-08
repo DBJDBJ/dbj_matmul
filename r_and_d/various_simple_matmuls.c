@@ -57,14 +57,26 @@ dbj_simple_matmuls_algo_table[DBJ_MATMUL_API_FUN_ID].function(\
 )
 
 UBENCH(simple, matmul_0) { UBENCH_COMMON_BODY(0); }
-UBENCH(simple, matmul_1) { UBENCH_COMMON_BODY(1); }
-UBENCH(simple, matmul_3) { UBENCH_COMMON_BODY(3); }
-UBENCH(simple, matmul_4) { UBENCH_COMMON_BODY(4); }
-#ifdef HAVE_CBLAS
-UBENCH(simple, matmul_5_cblas) { UBENCH_COMMON_BODY(5); }
-UBENCH(simple, matmul_6_cblas) { UBENCH_COMMON_BODY(6); }
-#endif // HAVE_CBLAS
+UBENCH(simple, matmul_0_0) { 
+simple_mat_mul_0_0(
+	TMCD_.rows, TMCD_.cols, TMCD_.rows, /* BUG?! */ 
+	TMCD_.mx_data_A , TMCD_.mx_data_B, TMCD_.mx_data_M 
+);
+}
+
+#if 0
+
+UBENCH(simple, matmul_1) { UBENCH_COMMON_BODY(2); }
 #if __SSE__
-UBENCH(simple, matmul_2_sse) { UBENCH_COMMON_BODY(2); }
-UBENCH(simple, matmul_7_sse) { UBENCH_COMMON_BODY(7); }
+UBENCH(simple, matmul_2_sse) { UBENCH_COMMON_BODY(3); }
+UBENCH(simple, matmul_7_sse) { UBENCH_COMMON_BODY(4); }
 #endif // __SSE__
+UBENCH(simple, matmul_3) { UBENCH_COMMON_BODY(5); }
+UBENCH(simple, matmul_4) { UBENCH_COMMON_BODY(6); }
+
+#ifdef HAVE_CBLAS
+UBENCH(simple, matmul_5_cblas) { UBENCH_COMMON_BODY(7); }
+UBENCH(simple, matmul_6_cblas) { UBENCH_COMMON_BODY(8); }
+#endif // HAVE_CBLAS
+
+#endif // 0

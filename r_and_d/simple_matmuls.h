@@ -61,17 +61,21 @@ DBJ_API void* simple_mat_mul_null(
 	return NULL;
 }
 
+DBJ_API void* simple_mat_mul_0_0(
+	const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
+	DBJ_MATRIX_DATA_TYPE*, DBJ_MATRIX_DATA_TYPE*, DBJ_MATRIX_DATA_TYPE*);
+
 DBJ_API void* simple_mat_mul_0(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
-	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE m[/*n_a_rows*/][* /*n_b_cols*/]);
+	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/]);
 
 DBJ_API void* simple_mat_mul_1(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
-	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE m[/*n_a_rows*/][* /*n_b_cols*/]);
+	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/]);
 
 DBJ_API void* simple_mat_mul_3(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
-	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE m[/*n_a_rows*/][* /*n_b_cols*/]);
+	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/]);
 
 DBJ_API void* simple_mat_mul_4(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
-	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE m[/*n_a_rows*/][* /*n_b_cols*/]);
+	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/]);
 
 #if __SSE__
 
@@ -93,19 +97,17 @@ DBJ_API void* simple_mat_mul_6(const unsigned /*n_a_rows*/, const unsigned /*n_a
 
 const simple_description_function_pair dbj_simple_matmuls_algo_table[] =
 {
-	DF_PAIR("0: simple naive - no optimization", simple_mat_mul_0),
-	DF_PAIR("1: simple transposing the second matrix", simple_mat_mul_1),
-	DF_PAIR("2: simple explicitly vectorized sdot() with SSE", simple_mat_mul_2), /* requires __SSE__ */
-	DF_PAIR("3: simple implicitly vectorized sdot()", simple_mat_mul_3),
-	DF_PAIR("4: simple no vectorization hints", simple_mat_mul_4),
+	DF_PAIR("0: MAX optimization", simple_mat_mul_0_0),
+	DF_PAIR("1: simple naive - no optimization", simple_mat_mul_0),
+	DF_PAIR("2: simple transposing the second matrix", simple_mat_mul_1),
+	DF_PAIR("3: simple explicitly vectorized sdot() with SSE", simple_mat_mul_2), /* requires __SSE__ */
+	DF_PAIR("4: simple explicitly SSE sdot() plus loop tiling", simple_mat_mul_7) , /* requires __SSE__ */
+	DF_PAIR("5: simple implicitly vectorized sdot()", simple_mat_mul_3),
+	DF_PAIR("6: simple no vectorization hints", simple_mat_mul_4),
 #ifdef HAVE_CBLAS
-		DF_PAIR("5: simple with sdot() from an external CBLAS library", simple_mat_mul_5),
-		DF_PAIR("6: simple with sgemm() from an external CBLAS library", simple_mat_mul_6),
-#else
-		DF_PAIR("5: simple with sdot() from CBLAS library not implemented ", simple_mat_mul_null),
-		DF_PAIR("6: simple with sgemm() from CBLAS library not implemented ", simple_mat_mul_null),
+	DF_PAIR("7: simple with sdot() from an external CBLAS library", simple_mat_mul_5),
+	DF_PAIR("8: simple with sgemm() from an external CBLAS library", simple_mat_mul_6),
 #endif																	// ! HAVE_CBLAS
-		DF_PAIR("7: simple explicitly SSE sdot() plus loop tiling", simple_mat_mul_7) /* requires __SSE__ */
 };
 
 static const unsigned dbj_simple_matmuls_algo_table_size = (sizeof(dbj_simple_matmuls_algo_table) / sizeof(dbj_simple_matmuls_algo_table[0]));
@@ -219,6 +221,29 @@ DBJ_API DBJ_MATRIX_DATA_TYPE simple_sdot_sse(int n, const DBJ_MATRIX_DATA_TYPE x
 	   compiler, OS and hardware
 
  */
+
+DBJ_API void* simple_mat_mul_0_0(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	DBJ_MATRIX_DATA_TYPE* a, DBJ_MATRIX_DATA_TYPE* b, DBJ_MATRIX_DATA_TYPE* m)
+{
+	// runtime casting takes time
+	const unsigned n_b_rows = n_a_cols;
+	DBJ_MATRIX_DATA_TYPE(*ax)[n_a_cols] = a;
+	DBJ_MATRIX_DATA_TYPE(*bx)[n_b_cols] = b;
+	DBJ_MATRIX_DATA_TYPE(*mx)[n_b_rows] = m;
+
+	for (unsigned i = 0; i < n_a_rows; ++i)
+	{
+		for (unsigned j = 0; j < n_b_cols; ++j)
+		{
+			DBJ_MATRIX_DATA_TYPE t = 0.0;
+			for (unsigned k = 0; k < n_a_cols; ++k)
+				t += ax[i][k] * bx[k][j];
+			mx[i][j] = t;
+		}
+	}
+	return m;
+}
 
 DBJ_API void* simple_mat_mul_0(
 	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
