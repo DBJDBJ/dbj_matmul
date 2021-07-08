@@ -1,5 +1,14 @@
 #ifndef DBJ_DBJ_MATRIX_INC
 #define DBJ_DBJ_MATRIX_INC
+
+#ifndef __clang__
+#error please use clang compiler
+#error
+#else 
+#pragma clang system_header 
+#endif // __clang__
+
+#include <stdlib.h>
 /*
  DBJ MATRIX FRAMEWORK
 
@@ -46,13 +55,13 @@ static inline void* DBJ_MATRIX_ALLOC
 {
 	if (rows_ > DBJ_SANITY_MAX_ROW_COUNT) return NULL;
 	if (cols_ > DBJ_SANITY_MAX_COL_COUNT) return NULL;
-	return calloc(rows_ * cols_, type_size_);
+	return calloc(1, type_size_);
 }
 
 #define DBJ_MATRIX_NEW(N_,T_,R_,C_) \
 do { \
 assert(N_ == NULL) ; \
-DBJ_MATRIX_STRUCT(T_) * retval = DBJ_MATRIX_ALLOC(R_,C_, sizeof(T_)); \
+DBJ_MATRIX_STRUCT(T_) * retval = DBJ_MATRIX_ALLOC(R_,C_, DBJ_MATRIX_STRUCT_SIZE(T_,R_,C_) ); \
 	 if (retval) { \
 		 retval->rows = R_ ; \
 		 retval->cols = C_ ; \

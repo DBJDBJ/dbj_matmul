@@ -16,6 +16,37 @@
 
 #define DBJ_API static
 
+//////////////////////////////////////////////////////////////////////
+
+/*
+* 1 sec == 1000 milli sec == 1e+6 micro sec == 1e+9 nano sec
+*/
+
+typedef struct { unsigned long v; } dbj_milsec;
+typedef struct { unsigned long v; } dbj_sec;
+
+#define dbj_one_sec (dbj_milsec){ .v = 1000 }
+
+#ifdef _WIN32
+// from synchapi.h
+extern void Sleep(
+	unsigned long /*DWORD*/ dwMilliseconds
+);
+#else
+#include <unistd.h>
+#endif
+
+DBJ_API void dbj_sleep(dbj_milsec milisec_)
+{
+#ifdef _WIN32
+	Sleep(milisec_.v);
+#else
+	usleep(milisec_.v * 1000);  /* sleep for 100 milliSeconds */
+#endif
+}
+
+//////////////////////////////////////////////////////////////////////
+
 typedef void* (*mat_mul_function) (
 	const unsigned, const unsigned, const unsigned,
 	float a[][*], float b[][*], float m[][*]
@@ -91,7 +122,8 @@ DBJ_API float_matrix_struct* new_float_matrix(const unsigned n_rows, const unsig
 {
 	// float_matrix_struct* retval = NULL; // must be init to NULL
 
-	float_matrix_struct* retval = DBJ_MATRIX_ALLOC(n_rows, n_cols, sizeof(float));
+	float_matrix_struct* retval = DBJ_MATRIX_ALLOC(n_rows, n_cols, DBJ_MATRIX_STRUCT_SIZE(float, n_rows, n_cols));
+
 	if (retval) {
 		retval->rows = n_rows;
 		retval->cols = n_cols;
@@ -345,7 +377,9 @@ DBJ_API** mat_mul6(int n_a_rows, int n_a_cols, float* const* a, int n_b_cols, fl
 
 /**********************************************************************************/
 
-enum { default_multiplication_algorithm = 4, max_matrix_side = 0xFF + 0xFF };
+enum {
+	default_multiplication_algorithm = 4, max_matrix_side = DBJ_SANITY_MAX_ROW_COUNT
+};
 
 /*
 These are square matrices, matrix_side_length is the length of the side of that square
@@ -430,20 +464,22 @@ return EXIT_SUCCESS;
 }
 
 static void test_various_matmuls(
-	const unsigned mx_size /*= 0xFF*/,
-	const unsigned outer_loop_ /*= 0xF*/
+	const unsigned mx_size /* = 0xFF */,
+	const unsigned outer_loop_ /* reserved */
 )
 {
 	(void)outer_loop_;
 	fprintf(stderr, "\n------------------------------------------------");
-	fprintf(stderr, "\nMatrix size: %4d", mx_size);
+	fprintf(stderr, "\nMatrix width == height == size: %4d", mx_size);
 
-	const unsigned algo_table_count = sizeof(algo_table) / sizeof(algo_table[0]);
+	static const unsigned algo_table_count = sizeof(algo_table) / sizeof(algo_table[0]);
 
 	for (unsigned k = 0; k < algo_table_count; ++k)
 	{
 		fprintf(stderr, "\n------------------------------------------------");
 		test_matmul(mx_size, k, algo_table[k]);
+
+		dbj_sleep(dbj_one_sec);
 #if 0
 		test_matmul(mx_size, 1, algo_name_[1]);
 #ifdef __SSE__
@@ -467,6 +503,6 @@ int various_matmuls(const int argc, const char** argv)
 	(void)argv;
 	//float_matrix_struct* fmtp = make_random_float_matrix(3, 4);
 	//DBJ_MATRIX_FREE(fmtp);
-	test_various_matmuls(0xF, 0xF);
+	test_various_matmuls(DBJ_SANITY_MAX_ROW_COUNT / 100, 0 /* reserved */);
 	return 42;
 }
