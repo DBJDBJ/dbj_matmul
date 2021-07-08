@@ -90,15 +90,11 @@ DBJ_API void* mat_mul_6(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/
 #endif // HAVE_CBLAS
 
 
-const description_function_pair algo_table[] =
+const description_function_pair dbj_float_matmuls_algo_table[] =
 {
 DF_PAIR("0: naive - no optimization" , mat_mul_0) ,
 DF_PAIR("1: transposing the second matrix" , mat_mul_1) ,
-#if __SSE__
-DF_PAIR("2: explicitly vectorized sdot() with SSE" , mat_mul_2) ,
-#else
-DF_PAIR("2: explicitly vectorized sdot() with SSE not implemented" , mat_mul_null) ,
-#endif // ! __SSE__
+DF_PAIR("2: explicitly vectorized sdot() with SSE" , mat_mul_2) , /* requires __SSE__ */
 DF_PAIR("3: implicitly vectorized sdot()" , mat_mul_3) ,
 DF_PAIR("4: no vectorization hints", mat_mul_4) ,
 #ifdef HAVE_CBLAS
@@ -108,12 +104,10 @@ DF_PAIR("6: with sgemm() from an external CBLAS library", mat_mul_6) ,
 DF_PAIR("5: with sdot() from CBLAS library not implemented " , mat_mul_null) ,
 DF_PAIR("6: with sgemm() from CBLAS library not implemented ", mat_mul_null) ,
 #endif // ! HAVE_CBLAS
-#if __SSE__
-DF_PAIR("7: explicitly SSE sdot() plus loop tiling", mat_mul_7)
-#else
-DF_PAIR("7: explicitly SSE sdot() plus loop tiling not implemented" , mat_mul_null) ,
-#endif // ! __SSE__
+DF_PAIR("7: explicitly SSE sdot() plus loop tiling", mat_mul_7) /* requires __SSE__ */
 };
+
+static const unsigned dbj_float_matmuls_algo_table_size = (sizeof(dbj_float_matmuls_algo_table) / sizeof(dbj_float_matmuls_algo_table[0]));
 
 //////////////////////////////////////////////////////////////////////
 #ifdef DBJ_FLOAT_VARIOUS_MATMULS_IMPLEMENTATION
@@ -277,13 +271,15 @@ DBJ_API void* mat_mul_1(
 	return m;
 }
 
-#ifdef __SSE__
-
 DBJ_API void* mat_mul_2(
 	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
 	float a[static n_a_rows][n_a_cols], float b[static n_a_rows][n_b_cols], float m[static n_a_rows][n_b_cols]
 )
 {
+#ifndef __SSE__
+#error __SEE__ is required here
+#endif
+
 	const unsigned n_b_rows = n_a_cols;
 
 	float_matrix_struct* Temp = new_float_matrix(n_b_cols, n_b_rows);
@@ -303,6 +299,10 @@ DBJ_API void* mat_mul_7(
 	float a[static n_a_rows][n_a_cols], float b[static n_a_rows][n_b_cols], float m[static n_a_rows][n_b_cols]
 )
 {
+#ifndef __SSE__
+#error __SEE__ is required here
+#endif
+
 	const unsigned x = 16, n_b_rows = n_a_cols;
 
 	float_matrix_struct* Temp = new_float_matrix(n_b_cols, n_b_rows);
@@ -312,8 +312,8 @@ DBJ_API void* mat_mul_7(
 
 	for (unsigned i = 0; i < n_a_rows; i += x) {
 		for (unsigned j = 0; j < n_b_cols; j += x) {
-			int je = n_b_cols < j + x ? n_b_cols : j + x;
-			int ie = n_a_rows < i + x ? n_a_rows : i + x;
+			unsigned je = n_b_cols < j + x ? n_b_cols : j + x;
+			unsigned ie = n_a_rows < i + x ? n_a_rows : i + x;
 			for (unsigned ii = i; ii < ie; ++ii)
 				for (unsigned jj = j; jj < je; ++jj)
 					m[ii][jj] += sdot_sse(n_a_cols, a[ii], bT[jj]);
@@ -322,7 +322,6 @@ DBJ_API void* mat_mul_7(
 	free(Temp);
 	return m;
 }
-#endif // __SSE__
 
 /////////////////////////////////////////////////////////////////////////////////////
 
