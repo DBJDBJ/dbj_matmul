@@ -7,8 +7,6 @@
 
 #include "ubench.h/ubench.h"
 
-
-
 #undef DBJ_API
 #define DBJ_API __attribute__((const)) static
 
@@ -62,19 +60,19 @@ DBJ_API void app_end(void)
 	free(app_data.rezult);
 }
 
-UBENCH(dbj_matmul, dot_simple) {
+UBENCH(dbj_, simple) {
 	dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
-UBENCH(dbj_matmul, dot_faster) {
+UBENCH(dbj_, faster) {
 	dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
-UBENCH(dbj_matmul, omp_dot_simple) {
+UBENCH(dbj_, omp_simple) {
 	omp_dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
-UBENCH(dbj_matmul, omp_dot_faster) {
+UBENCH(dbj_, omp_faster) {
 	omp_dot_faster(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 

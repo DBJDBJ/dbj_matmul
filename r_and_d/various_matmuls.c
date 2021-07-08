@@ -3,14 +3,6 @@
 
 #include "../dbj_matmul_common.h"
 
-//#include <assert.h>
-//#include <stdlib.h>
-//#include <stdint.h>
-//#include <string.h>
-//#include <stdio.h>
-//#include <time.h>
-
-
 #define DBJ_FLOAT_VARIOUS_MATMULS_IMPLEMENTATION
 #include "dbj_float_various_matmuls.h"
 #include "pseudo_random.h"
@@ -93,15 +85,15 @@ dbj_float_matmuls_algo_table[DBJ_MATMUL_API_FUN_ID].function(\
 	TMCD_.mx_struct_A->data , TMCD_.mx_struct_B->data, TMCD_.mx_struct_M->data\
 )
 
-UBENCH(dbj_various_float_matmuls, matmul_0) { UBENCH_COMMON_BODY(0); }
-UBENCH(dbj_various_float_matmuls, matmul_1) { UBENCH_COMMON_BODY(1); }
-UBENCH(dbj_various_float_matmuls, matmul_3) { UBENCH_COMMON_BODY(3); }
-UBENCH(dbj_various_float_matmuls, matmul_4) { UBENCH_COMMON_BODY(4); }
+UBENCH(float_, matmul_0) { UBENCH_COMMON_BODY(0); }
+UBENCH(float_, matmul_1) { UBENCH_COMMON_BODY(1); }
+UBENCH(float_, matmul_3) { UBENCH_COMMON_BODY(3); }
+UBENCH(float_, matmul_4) { UBENCH_COMMON_BODY(4); }
 #ifdef HAVE_CBLAS
-UBENCH(dbj_various_float_matmuls, matmul_5_cblas) { UBENCH_COMMON_BODY(5); }
-UBENCH(dbj_various_float_matmuls, matmul_6_cblas) { UBENCH_COMMON_BODY(6); }
+UBENCH(float_, matmul_5_cblas) { UBENCH_COMMON_BODY(5); }
+UBENCH(float_, matmul_6_cblas) { UBENCH_COMMON_BODY(6); }
 #endif // HAVE_CBLAS
 #if __SSE__
-UBENCH(dbj_various_float_matmuls, matmul_2_sse) { UBENCH_COMMON_BODY(2); }
-UBENCH(dbj_various_float_matmuls, matmul_7_sse) { UBENCH_COMMON_BODY(7); }
+UBENCH(float_, matmul_2_sse) { UBENCH_COMMON_BODY(2); }
+UBENCH(float_, matmul_7_sse) { UBENCH_COMMON_BODY(7); }
 #endif // __SSE__
