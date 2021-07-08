@@ -28,10 +28,10 @@ void omp_init_rand(double* a, const unsigned n_rows_a, const unsigned n_cols_a);
 double* omp_transpose(const double* m, const unsigned n_rows_m, const unsigned n_cols_m, double* t);
 
 double* omp_dot_simple(const double* a, const unsigned n_rows_a, const unsigned n_cols_a,
-	const double* b, const unsigned n_rows_b, const unsigned n_cols_b);
+	const double* b, const unsigned n_rows_b, const unsigned n_cols_b, double*);
 
 double* omp_dot_faster(const double* a, const unsigned n_rows_a, const unsigned n_cols_a,
-	const double* b, const unsigned n_rows_b, const unsigned n_cols_b);
+	const double* b, const unsigned n_rows_b, const unsigned n_cols_b, double*);
 /////////////////////////////////////////////////////////////////////////////////
 
 #ifdef DBJ_MATMUL_OMP_IMP
@@ -81,20 +81,16 @@ double* omp_transpose(const double* m, const unsigned n_rows_m, const unsigned n
  * Allocates and returns an array.
  * This variant doesn't transpose matrix b, and it's a lot slower. */
 double* omp_dot_simple(const double* a, const unsigned n_rows_a, const unsigned n_cols_a,
-	const double* b, const unsigned n_rows_b, const unsigned n_cols_b) {
+	const double* b, const unsigned n_rows_b, const unsigned n_cols_b, double* c) {
 
-	if (n_cols_a != n_rows_b) {
-		printf("#columns A must be equal to #rows B!\n");
-		system("pause");
-		exit(-2);
-	}
+	assert(n_cols_a == n_rows_b);
 
-	double* c = malloc(n_rows_a * n_cols_b * sizeof(*c));
-	if (c == NULL) {
-		printf("Couldn't allocate memory!\n");
-		system("pause");
-		exit(-1);
-	}
+	//double* c = malloc(n_rows_a * n_cols_b * sizeof(*c));
+	//if (c == NULL) {
+	//	printf("Couldn't allocate memory!\n");
+	//	system("pause");
+	//	exit(-1);
+	//}
 
 	int i, j, k;
 
@@ -116,25 +112,14 @@ double* omp_dot_simple(const double* a, const unsigned n_rows_a, const unsigned 
  * Allocates and returns an array.
  * This variant transposes matrix b, and it's a lot faster. */
 double* omp_dot_faster(const double* a, const unsigned n_rows_a, const unsigned n_cols_a,
-	const double* b, const unsigned n_rows_b, const unsigned n_cols_b) {
+	const double* b, const unsigned n_rows_b, const unsigned n_cols_b, double* c) {
 
-	int i, j, k;
+	assert(n_cols_a == n_rows_b);
 
-	if (n_cols_a != n_rows_b) {
-		printf("#columns A must be equal to #rows B!\n");
-		system("pause");
-		exit(-2);
-	}
+	unsigned i, j, k;
 
 	double* bt = malloc(n_rows_b * n_cols_b * sizeof(*b));
-
-	double* c = malloc(n_rows_a * n_cols_b * sizeof(*c));
-
-	if ((c == NULL) || (bt == NULL)) {
-		printf("Couldn't allocate memory!\n");
-		system("pause");
-		exit(-1);
-	}
+	assert(bt);
 
 	bt = omp_transpose(b, n_rows_b, n_cols_b, bt);
 

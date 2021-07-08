@@ -9,9 +9,8 @@
 #include <cblas.h>
 #endif
 
-#ifndef DBJ_API 
-#define DBJ_API static
-#endif // DBJ_API 
+#undef DBJ_API 
+#define DBJ_API 
 
 //////////////////////////////////////////////////////////////////////
 // all of the bellow uses:

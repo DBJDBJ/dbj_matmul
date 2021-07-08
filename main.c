@@ -7,6 +7,8 @@
 
 #include "ubench.h/ubench.h"
 
+
+
 #undef DBJ_API
 #define DBJ_API __attribute__((const)) static
 
@@ -14,31 +16,25 @@
 // ubench bench functions have no parameters
 // thus we use common data aka globals
 
-#define SCALE 1U
-// #define SCALE 400U
-
 static struct app_data_type {
 
-	const unsigned scale;
-	const unsigned n_rows_a; // 4 * scale;
-	const unsigned n_cols_a; // 3 * scale;
-	const unsigned n_rows_b; // 3 * scale;
-	const unsigned n_cols_b; // 2 * scale;
+	const unsigned n_rows_a;
+	const unsigned n_cols_a;
+	const unsigned n_rows_b;
+	const unsigned n_cols_b;
 
 	unsigned start_counter;
 
 	// the matrixes
 	double* a;
 	double* b;
-	double* c;
-	double* d;
+	double* rezult; /* rezult size is a rows * b cols */
 
 } app_data = {
-	.scale = SCALE ,
-	.n_rows_a = 0xF * SCALE ,
-	.n_cols_a = 0xF * SCALE ,
-	.n_rows_b = 0xF * SCALE ,
-	.n_cols_b = 0xF * SCALE
+	.n_rows_a = DBJ_MATRIX_SIDE_DIMENSION ,
+	.n_cols_a = DBJ_MATRIX_SIDE_DIMENSION ,
+	.n_rows_b = DBJ_MATRIX_SIDE_DIMENSION ,
+	.n_cols_b = DBJ_MATRIX_SIDE_DIMENSION
 	// the rest is auto zeroed in C
 };
 
@@ -47,44 +43,39 @@ DBJ_API void app_end(void) _destructor_;
 
 DBJ_API void app_start(void)
 {
-	if (app_data.start_counter < 1) {
-		ALLOC_WITH_POLICY(app_data.a, app_data.n_rows_a * app_data.n_cols_a * sizeof(*app_data.a));
-		ALLOC_WITH_POLICY(app_data.b, app_data.n_rows_b * app_data.n_cols_b * sizeof(*app_data.b));
+	ALLOC_WITH_POLICY(app_data.a, app_data.n_rows_a * app_data.n_cols_a * sizeof(*app_data.a));
+	ALLOC_WITH_POLICY(app_data.b, app_data.n_rows_b * app_data.n_cols_b * sizeof(*app_data.b));
+	ALLOC_WITH_POLICY(app_data.rezult, app_data.n_rows_a * app_data.n_cols_b * sizeof(*app_data.rezult));
 
-		init_rand(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
-		init_rand(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
+	//init_rand(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
+	//init_rand(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
 
-		init_seq(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
-		init_seq(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	}
-
-	app_data.start_counter += 1;
+	init_seq(app_data.a, app_data.n_rows_a, app_data.n_cols_a);
+	init_seq(app_data.b, app_data.n_rows_b, app_data.n_cols_b);
+	init_seq(app_data.rezult, app_data.n_rows_a, app_data.n_cols_b);
 }
 
 DBJ_API void app_end(void)
 {
 	free(app_data.a);
 	free(app_data.b);
+	free(app_data.rezult);
 }
 
 UBENCH(dbj_matmul, dot_simple) {
-	app_data.c = dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	free(app_data.c);
+	dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
 UBENCH(dbj_matmul, dot_faster) {
-	app_data.d = dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	free(app_data.d);
+	dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
 UBENCH(dbj_matmul, omp_dot_simple) {
-	app_data.c = omp_dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	free(app_data.c);
+	omp_dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
 UBENCH(dbj_matmul, omp_dot_faster) {
-	app_data.d = omp_dot_faster(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b);
-	free(app_data.d);
+	omp_dot_faster(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
 

@@ -1,12 +1,14 @@
 
 #include "../ubench.h/ubench.h"
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
+#include "../dbj_matmul_common.h"
+
+//#include <assert.h>
+//#include <stdlib.h>
+//#include <stdint.h>
+//#include <string.h>
+//#include <stdio.h>
+//#include <time.h>
 
 
 #define DBJ_FLOAT_VARIOUS_MATMULS_IMPLEMENTATION
@@ -51,8 +53,8 @@ DBJ_API void dbj_sleep(dbj_milsec milisec_)
 
 enum {
 	default_multiplication_algorithm = 4, max_matrix_side = DBJ_SANITY_MAX_ROW_COUNT,
-	testing_matrix_rows = 0xF,
-	testing_matrix_cols = 0xF
+	testing_matrix_rows = DBJ_MATRIX_SIDE_DIMENSION,
+	testing_matrix_cols = DBJ_MATRIX_SIDE_DIMENSION
 };
 
 typedef struct {
@@ -82,22 +84,14 @@ DBJ_API void test_matmul_common_data_destructor(void)
 	if (TMCD_.mx_struct_B) free(TMCD_.mx_struct_B);
 }
 
-// variably modified type declaration is not allowed at file scope 
-// thuse we have to tyepedef and cast inside functions
-
+/*
+* calling direct or with table lokup makes no difference in speed
+*/
 #define UBENCH_COMMON_BODY(DBJ_MATMUL_API_FUN_ID) \
-do { \
-DBJ_MATRIX_ALIAS(matrix, float, TMCD_.cols);\
-\
-DBJ_MATRIX_CAST(mx_A, matrix, TMCD_.mx_struct_A);\
-DBJ_MATRIX_CAST(mx_B, matrix, TMCD_.mx_struct_B);\
-DBJ_MATRIX_CAST(mx_M, matrix, TMCD_.mx_struct_M);\
-\
 dbj_float_matmuls_algo_table[DBJ_MATMUL_API_FUN_ID].function(\
 	TMCD_.rows, TMCD_.cols, TMCD_.rows, /* BUG?! */ \
-	mx_A, mx_B, mx_M\
-);\
-} while (0)
+	TMCD_.mx_struct_A->data , TMCD_.mx_struct_B->data, TMCD_.mx_struct_M->data\
+)
 
 UBENCH(dbj_various_float_matmuls, matmul_0) { UBENCH_COMMON_BODY(0); }
 UBENCH(dbj_various_float_matmuls, matmul_1) { UBENCH_COMMON_BODY(1); }

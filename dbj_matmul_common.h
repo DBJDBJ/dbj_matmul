@@ -55,10 +55,10 @@
 #define _unused_ __attribute__((__unused__))
 #define _cleanup_(x) __attribute__((__cleanup__(x)))
 
-// usage: type_name _auto_cleanup_ pointer_name ;
-// example
-// char * _auto_cleanup_ str = strdup("string content");
-//
+ // usage: type_name _auto_cleanup_ pointer_name ;
+ // example
+ // char * _auto_cleanup_ str = strdup("string content");
+ //
 #define _auto_cleanup_ _cleanup_(cleanup_free)
 
  // DBJ 2021-JUL-05
@@ -179,3 +179,9 @@ static inline void cleanup_free(void* p) {
 				asm volatile ("" : : : "memory");                       \
 				_copy;                                                  \
 		})
+
+ /*
+ * ----------------------------------------------------------------------------------------------------
+ */
+#define DBJ_MATRIX_SIDE_DIMENSION 1024
+#define DBJ_MATRIX_DATA_TYPE double
