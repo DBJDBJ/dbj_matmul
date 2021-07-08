@@ -142,7 +142,7 @@ DBJ_API float_matrix_struct* new_float_matrix(const unsigned n_rows, const unsig
 allocate new matrix and populate it with random float's
 */
 DBJ_API float_matrix_struct* make_random_float_matrix(
-	const unsigned n_rows, const unsigned  n_cols, float (*)(void) float_rand
+	const unsigned n_rows, const unsigned  n_cols, float (*float_rand)(void)
 )
 {
 	float_matrix_struct* fmt_pointer = new_float_matrix(n_rows, n_cols);

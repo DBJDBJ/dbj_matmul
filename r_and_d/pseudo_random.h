@@ -6,7 +6,9 @@
 
 #include <stdint.h>
 
-static uint64_t pseudo_random_seeds_[2] = { 11ULL, 1181783497276652981ULL };
+static const float PSEUDO_RANDOM_KONSTANT = (1.0 / 9007199254740992.0);
+
+static uint64_t PSEUDO_RANDOM_SEEDS_[2] = { 11ULL, 1181783497276652981ULL };
 
 static inline uint64_t xorshift128plus(uint64_t s[static 2])
 {
@@ -21,12 +23,12 @@ static inline uint64_t xorshift128plus(uint64_t s[static 2])
 
 static inline double pseudo_rand_double(void)
 {
-	return (double)(xorshift128plus(pseudo_random_seeds_) >> 11) * (1.0 / 9007199254740992.0);
+	return (double)(xorshift128plus(PSEUDO_RANDOM_SEEDS_) >> 11) * PSEUDO_RANDOM_KONSTANT;
 }
 
 static inline float pseudo_rand_float(void)
 {
-	return (float)(xorshift128plus(pseudo_random_seeds_) >> 11) * (1.0 / 9007199254740992.0);
+	return (float)(xorshift128plus(PSEUDO_RANDOM_SEEDS_) >> 11) * PSEUDO_RANDOM_KONSTANT;
 }
 
 #endif // PSEUDO_RANDOM_INC

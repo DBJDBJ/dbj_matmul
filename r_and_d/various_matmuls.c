@@ -47,15 +47,45 @@ DBJ_API void dbj_sleep(dbj_milsec milisec_)
 /**********************************************************************************/
 
 enum {
-	default_multiplication_algorithm = 4, max_matrix_side = DBJ_SANITY_MAX_ROW_COUNT
+	default_multiplication_algorithm = 4, max_matrix_side = DBJ_SANITY_MAX_ROW_COUNT,
+	testing_matrix_rows = 0xFF,
+	testing_matrix_cols = 0xFF
 };
+
+typedef struct {
+	unsigned rows;
+	unsigned cols;
+	float_matrix_struct* mx_struct_A;
+	float_matrix_struct* mx_struct_B;
+	float_matrix_struct* mx_struct_M;
+} test_matmul_common_data;
+
+DBJ_API test_matmul_common_data TMCD_ = { .rows = testing_matrix_rows, .cols = testing_matrix_cols, NULL, NULL, NULL };
+
+__attribute__((constructor))
+DBJ_API test_matmul_common_data_constructor(void)
+{
+	TMCD_.mx_struct_A = make_random_float_matrix(TMCD_.rows, TMCD_.cols, pseudo_rand_float);
+	TMCD_.mx_struct_B = make_random_float_matrix(TMCD_.rows, TMCD_.cols, pseudo_rand_float);
+
+	TMCD_.mx_struct_M = new_float_matrix(TMCD_.cols, TMCD_.rows);
+}
+
+__attribute__((destructor))
+DBJ_API test_matmul_common_data_destructor(void)
+{
+	if (TMCD_.mx_struct_M) free(TMCD_.mx_struct_M);
+	if (TMCD_.mx_struct_A) free(TMCD_.mx_struct_A);
+	if (TMCD_.mx_struct_B) free(TMCD_.mx_struct_B);
+}
+
 
 /*
 These are square matrices, matrix_side_length is the length of the side of that square
 matrix data type is pointer to pointer
 matrix element type is float
 */
-DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, description_function_pair dfp)
+DBJ_API int test_matmul(unsigned algorithm_id, description_function_pair dfp)
 {
 	int algo = algorithm_id; (void)algo;
 	const char* algo_name = dfp.description;
@@ -63,28 +93,28 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, desc
 
 	assert(algo_name);
 
-	DBJ_MATRIX_ALIAS(matrix, float, matrix_side_length);
+	DBJ_MATRIX_ALIAS(matrix, float, TMCD_.cols);
 
-	float_matrix_struct* mx_struct_A = NULL, * mx_struct_B = NULL, * mx_struct_M = NULL;
+	//float_matrix_struct* mx_struct_A = NULL, * mx_struct_B = NULL, * mx_struct_M = NULL;
 
-	assert(matrix_side_length < max_matrix_side);
-	// release mode: quietly adjusting to max side .. not exactly good but ok in this context
-	matrix_side_length = matrix_side_length % (size_t)max_matrix_side;
+	//assert(matrix_side_length < max_matrix_side);
+	//// release mode: quietly adjusting to max side .. not exactly good but ok in this context
+	//matrix_side_length = matrix_side_length % (size_t)max_matrix_side;
 
-	mx_struct_A = make_random_float_matrix(matrix_side_length, matrix_side_length, pseudo_rand_float);
-	mx_struct_B = make_random_float_matrix(matrix_side_length, matrix_side_length, pseudo_rand_float);
+	//mx_struct_A = make_random_float_matrix(matrix_side_length, matrix_side_length, pseudo_rand_float);
+	//mx_struct_B = make_random_float_matrix(matrix_side_length, matrix_side_length, pseudo_rand_float);
 
-	mx_struct_M = new_float_matrix(matrix_side_length, matrix_side_length);
+	//mx_struct_M = new_float_matrix(matrix_side_length, matrix_side_length);
 
-	DBJ_MATRIX_CAST(mx_A, matrix, mx_struct_A);
-	DBJ_MATRIX_CAST(mx_B, matrix, mx_struct_B);
-	DBJ_MATRIX_CAST(mx_M, matrix, mx_struct_M);
+	DBJ_MATRIX_CAST(mx_A, matrix, TMCD_.mx_struct_A);
+	DBJ_MATRIX_CAST(mx_B, matrix, TMCD_.mx_struct_B);
+	DBJ_MATRIX_CAST(mx_M, matrix, TMCD_.mx_struct_M);
 
 
 	clock_t start_time_ = clock();
 
 	(void)mm_fun(
-		matrix_side_length, matrix_side_length, matrix_side_length,
+		TMCD_.rows, TMCD_.cols, TMCD_.rows, /* BUG?! */
 		mx_A, mx_B, mx_M
 	);
 
@@ -92,43 +122,26 @@ DBJ_API int test_matmul(unsigned matrix_side_length, unsigned algorithm_id, desc
 	fprintf(stderr, "\nCPU time: %2.3g sec", (double)(clock() - start_time_) / CLOCKS_PER_SEC);
 	// fprintf(stderr, "\nCentral cell: %g", mx_M[matrix_side_length / 2][matrix_side_length / 2]);
 
-	if (mx_struct_M) free(mx_struct_M);
-	if (mx_struct_A) free(mx_struct_A);
-	if (mx_struct_B) free(mx_struct_B);
+	//if (mx_struct_M) free(mx_struct_M);
+	//if (mx_struct_A) free(mx_struct_A);
+	//if (mx_struct_B) free(mx_struct_B);
 
 	return EXIT_SUCCESS;
 }
 
-static void test_various_matmuls(
-	const unsigned mx_size /* = 0xFF */,
-	const unsigned outer_loop_ /* reserved */
-)
+static void test_various_matmuls(void)
 {
-	(void)outer_loop_;
 	fprintf(stderr, "\n------------------------------------------------");
-	fprintf(stderr, "\nMatrix width == height == size: %4d", mx_size);
+	fprintf(stderr, "\nMatrix width == height == size: %4d", TMCD_.rows);
 
 	static const unsigned algo_table_count = sizeof(algo_table) / sizeof(algo_table[0]);
 
 	for (unsigned k = 0; k < algo_table_count; ++k)
 	{
 		fprintf(stderr, "\n------------------------------------------------");
-		test_matmul(mx_size, k, algo_table[k]);
+		test_matmul(k, algo_table[k]);
 
 		dbj_sleep(dbj_one_sec);
-#if 0
-		test_matmul(mx_size, 1, algo_name_[1]);
-#ifdef __SSE__
-		test_matmul(mx_size, 2, algo_name_[2]);
-		test_matmul(mx_size, 7, algo_name_[7]);
-#endif
-		test_matmul(mx_size, 3, algo_name_[3]);
-		test_matmul(mx_size, 4, algo_name_[4]);
-#ifdef HAVE_CBLAS
-		test_matmul(mx_size, 5, algo_name_[5]);
-		test_matmul(mx_size, 6, algo_name_[6]);
-#endif 
-#endif // 0
 	}
 
 }
@@ -139,6 +152,6 @@ int various_matmuls(const int argc, const char** argv)
 	(void)argv;
 	//float_matrix_struct* fmtp = make_random_float_matrix(3, 4);
 	//DBJ_MATRIX_FREE(fmtp);
-	test_various_matmuls(DBJ_SANITY_MAX_ROW_COUNT / 100, 0 /* reserved */);
+	test_various_matmuls();
 	return 42;
 }
