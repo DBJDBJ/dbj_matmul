@@ -62,8 +62,10 @@ DBJ_API void* simple_mat_mul_null(
 }
 
 DBJ_API void* simple_mat_mul_0_0(
-	const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
-	DBJ_MATRIX_DATA_TYPE*, DBJ_MATRIX_DATA_TYPE*, DBJ_MATRIX_DATA_TYPE*);
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	DBJ_MATRIX_DATA_TYPE(*ax)[n_a_cols],
+	DBJ_MATRIX_DATA_TYPE(*bx)[n_a_cols],
+	DBJ_MATRIX_DATA_TYPE(*mx)[n_a_cols]);
 
 DBJ_API void* simple_mat_mul_0(const unsigned /*n_a_rows*/, const unsigned /*n_a_cols*/, const unsigned /*n_b_cols*/,
 	DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_a_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/], DBJ_MATRIX_DATA_TYPE[/*n_a_rows*/][* /*n_b_cols*/]);
@@ -224,13 +226,15 @@ DBJ_API DBJ_MATRIX_DATA_TYPE simple_sdot_sse(int n, const DBJ_MATRIX_DATA_TYPE x
 
 DBJ_API void* simple_mat_mul_0_0(
 	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
-	DBJ_MATRIX_DATA_TYPE* a, DBJ_MATRIX_DATA_TYPE* b, DBJ_MATRIX_DATA_TYPE* m)
+	DBJ_MATRIX_DATA_TYPE(*ax)[n_a_cols],
+	DBJ_MATRIX_DATA_TYPE(*bx)[n_a_cols],
+	DBJ_MATRIX_DATA_TYPE(*mx)[n_a_cols])
 {
 	// runtime casting takes time
 	const unsigned n_b_rows = n_a_cols;
-	DBJ_MATRIX_DATA_TYPE(*ax)[n_a_cols] = a;
-	DBJ_MATRIX_DATA_TYPE(*bx)[n_b_cols] = b;
-	DBJ_MATRIX_DATA_TYPE(*mx)[n_b_rows] = m;
+	// DBJ_MATRIX_DATA_TYPE(*ax)[n_a_cols] = a;
+	// DBJ_MATRIX_DATA_TYPE(*bx)[n_b_cols] = b;
+	// DBJ_MATRIX_DATA_TYPE(*mx)[n_b_rows] = m;
 
 	for (unsigned i = 0; i < n_a_rows; ++i)
 	{
@@ -242,7 +246,7 @@ DBJ_API void* simple_mat_mul_0_0(
 			mx[i][j] = t;
 		}
 	}
-	return m;
+	return mx;
 }
 
 DBJ_API void* simple_mat_mul_0(
