@@ -28,6 +28,8 @@ DBJ_MATRIX_ALIAS(matrix, char, cols) ;
 
 DBJ_MATRIX_CAST(mx, matrix, char_matrix_struct_pointer);
 
+mx[0][0] = '!' ;
+
 */
 
 #ifndef DBJ_SANITY_MAX_ROW_COUNT
@@ -53,8 +55,11 @@ struct {\
 static inline void* DBJ_MATRIX_ALLOC
 (const unsigned rows_, const unsigned cols_, size_t type_size_)
 {
+	#ifndef NDEBUG
 	if (rows_ > DBJ_SANITY_MAX_ROW_COUNT) return NULL;
 	if (cols_ > DBJ_SANITY_MAX_COL_COUNT) return NULL;
+	#endif // NDEBUG
+
 	return calloc(1, type_size_);
 }
 
