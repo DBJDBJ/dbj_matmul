@@ -6,10 +6,8 @@ clang-cl aka clang 10.0.0 release build
 
 ```
 Microsoft Windows [Version 10.0.19042.1052]
-(c) Microsoft Corporation. All rights reserved.
-
-C:\Users\ddbj_matmul_Release.exe atmul\out>dbj
-
+```
+```
 Testing various matrix multiplication algorithms
 All matrices are square, side size is: 99       
 [==========] Running 6 benchmarks.

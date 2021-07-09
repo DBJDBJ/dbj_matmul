@@ -1,6 +1,22 @@
-/////////////////////////////////////////////////////////////////////////
+/*
 
-// #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
+ This is benchmarking of a collection of matrix multiplication algorithms.
+ Algorithms are kept as simple as possible. No structs are passed as arguments.
+
+ Different comoilers multiplied with different platforms multiplied selection
+ of data types  yield a complex picture of
+ benchmarking results.
+
+ Use this file to recompile and re measure whenver selecting
+ the right matrix multiplication algorithm
+
+ https://godbolt.org/z/joMo4Tn3T
+
+ */
+
+
+
+ // #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
 #include "ubench.h/ubench.h"
 
 #ifdef __linux__
@@ -9,40 +25,33 @@
 #include <intrin.h> // #define __SSE__ 1 for SEE versions
 #endif
 
+/* NDEBUG == RELEASE */
+#include <assert.h>
 /////////////////////////////////////////////////////////////////////////
 #define DBJ_MATMUL_IMPLEMENTATION
 #ifdef DBJ_MATMUL_IMPLEMENTATION
 /////////////////////////////////////////////////////////////////////////
-/* NDEBUG == RELEASE */
-#undef NDEBUG
-#include <assert.h>
-
-#define DBJ_MATRIX_SIDE_DIMENSION 99
 
 #undef NOMEM_POLICY
 
 #ifdef NDEBUG 
-
 #define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
-
 #else // ! NDEBUG == DEBUG
-
-#define NOMEM_POLICY( BOOLEXP_ )\
-if (! BOOLEXP_ ) {\
-perror( __FILE__ ", Could not allocate memory!");\
-exit(-1);\
-}
-
+#define NOMEM_POLICY( BOOLEXP_ ) if (! BOOLEXP_ ) { perror( __FILE__ ", Could not allocate memory!"); exit(-1); }
 #endif // ! NDEBUG
 
 #undef ALLOC_WITH_POLICY
-#define ALLOC_WITH_POLICY(PTR_ , SIZE_)    \
-do { PTR_ = calloc(1,SIZE_); NOMEM_POLICY(PTR_); } while(0)
+#define ALLOC_WITH_POLICY(PTR_ , SIZE_)  do { PTR_ = calloc(1,SIZE_); NOMEM_POLICY(PTR_); } while(0)
 
 #undef DBJ_API
 #define DBJ_API static
 /////////////////////////////////////////////////////////////////////////
-typedef float dbj_matrix_data_type;
+
+typedef double dbj_matrix_data_type;
+#define dbj_matrix_data_type_name "double"
+
+#define DBJ_MATRIX_SIDE_DIMENSION 0xFF
+
 /////////////////////////////////////////////////////////////////////////
 #if __SSE__
 
@@ -160,7 +169,7 @@ dbj_matrix_data_type* transpose(
  * Allocates and returns an array.
  * This variant doesn't transpose matrix b, and it's a lot slower. */
 DBJ_API
-dbj_matrix_data_type* dot_simple(const dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a,
+dbj_matrix_data_type* array1d_first(const dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a,
 	const dbj_matrix_data_type* b, const unsigned rows_b, const unsigned cols_b, dbj_matrix_data_type* c) {
 
 	assert(cols_a == rows_b);
@@ -182,7 +191,7 @@ dbj_matrix_data_type* dot_simple(const dbj_matrix_data_type* a, const unsigned r
  * Allocates and returns an array.
  * This variant transposes matrix b, and it's a lot faster. */
 DBJ_API
-dbj_matrix_data_type* dot(const dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a,
+dbj_matrix_data_type* array1d_second(const dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a,
 	const dbj_matrix_data_type* b, const unsigned rows_b, const unsigned cols_b, dbj_matrix_data_type* c) {
 
 	assert(cols_a == rows_b);
@@ -208,12 +217,12 @@ DBJ_API
 void init_seq(dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a) {
 	for (unsigned i = 0; i < rows_a; i++) {
 		for (unsigned j = 0; j < cols_a; j++) {
-			a[i * cols_a + j] = i * cols_a + j;
+			a[i * cols_a + j] = (dbj_matrix_data_type)(i * cols_a + j);
 		}
 	}
 }
 
-DBJ_API void* matmul_surprise(
+DBJ_API void* array_ptr_args(
 	const unsigned a_rows,
 	const unsigned cols_a,
 	const unsigned b_rows,
@@ -247,7 +256,7 @@ DBJ_API void* matmul_surprise(
 	return mx;
 }
 
-DBJ_API void* simple_mat_mul_0(
+DBJ_API void* matrix_args(
 	const unsigned a_rows, const unsigned a_cols,
 	const unsigned b_rows, const unsigned b_cols,
 	const unsigned m_rows, const unsigned m_cols,
@@ -316,7 +325,13 @@ __attribute__((constructor)) DBJ_API void app_start(void)
 	init_seq(app_data.r, app_data.rows_a, app_data.cols_b);
 
 	printf("\nTesting various matrix multiplication algorithms"
-		"\nAll matrices are square, side size is: %d\n", DBJ_MATRIX_SIDE_DIMENSION);
+		"\nAll matrices are square, side size is: %d"
+		"\nData type is: %s\n\n", DBJ_MATRIX_SIDE_DIMENSION, dbj_matrix_data_type_name);
+
+#ifdef WIN32
+	// VT100 ESC
+	system(" ");
+#endif
 }
 
 __attribute__((destructor)) DBJ_API void app_end(void)
@@ -327,16 +342,16 @@ __attribute__((destructor)) DBJ_API void app_end(void)
 }
 /////////////////////////////////////////////////////////////////////////
 
-UBENCH(godbolt, simple) {
-	dot_simple(app_data.a, app_data.rows_a, app_data.cols_a, app_data.b, app_data.rows_b, app_data.cols_b, app_data.r);
+UBENCH(matmul, array1d_first) {
+	array1d_first(app_data.a, app_data.rows_a, app_data.cols_a, app_data.b, app_data.rows_b, app_data.cols_b, app_data.r);
 }
 
-UBENCH(godbolt, not_faster) {
-	dot(app_data.a, app_data.rows_a, app_data.cols_a, app_data.b, app_data.rows_b, app_data.cols_b, app_data.r);
+UBENCH(matmul, array1d_second) {
+	array1d_second(app_data.a, app_data.rows_a, app_data.cols_a, app_data.b, app_data.rows_b, app_data.cols_b, app_data.r);
 }
 
-UBENCH(godbolt, snazzy) {
-	matmul_surprise(
+UBENCH(matmul, array_ptr_args) {
+	array_ptr_args(
 		app_data.rows_a,
 		app_data.cols_a,
 		app_data.rows_b,
@@ -348,39 +363,25 @@ UBENCH(godbolt, snazzy) {
 		(void*)app_data.r);
 }
 
-UBENCH(godbolt, simple_mat_mul_0) {
-	simple_mat_mul_0(
-		app_data.rows_a,
-		app_data.cols_a,
-		app_data.rows_b,
-		app_data.cols_b,
-		app_data.rows_r,
-		app_data.cols_r,
-		(void*)app_data.a,
-		(void*)app_data.b,
-		(void*)app_data.r);
+UBENCH(matmul, matrix_args) {
+	matrix_args(
+		app_data.rows_a, app_data.cols_a, app_data.rows_b, app_data.cols_b,
+		app_data.rows_r, app_data.cols_r, (void*)app_data.a,
+		(void*)app_data.b, (void*)app_data.r);
 }
 
 #if __SSE__
 
-UBENCH(godbolt, SSE_simpler_matmul) {
+UBENCH(matmul, SSE_simpler) {
 	SSE_matmul_simpler(
-		app_data.rows_a,
-		app_data.cols_a,
-		app_data.cols_b,
-		(void*)app_data.a,
-		(void*)app_data.b,
-		(void*)app_data.r);
+		app_data.rows_a, app_data.cols_a, app_data.cols_b, (void*)app_data.a,
+		(void*)app_data.b, (void*)app_data.r);
 }
 
-UBENCH(godbolt, SSE_better_matmul) {
+UBENCH(matmul, SSE_better) {
 	SSE_matmul_better(
-		app_data.rows_a,
-		app_data.cols_a,
-		app_data.cols_b,
-		(void*)app_data.a,
-		(void*)app_data.b,
-		(void*)app_data.r);
+		app_data.rows_a, app_data.cols_a, app_data.cols_b,
+		(void*)app_data.a, (void*)app_data.b, (void*)app_data.r);
 }
 
 #endif // __SSE__
