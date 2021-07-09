@@ -1,24 +1,52 @@
 /////////////////////////////////////////////////////////////////////////
-// https://godbolt.org/z/7nqTx7nxY
-/////////////////////////////////////////////////////////////////////////
 
-#include "dbj_matmul_common.h"
-
-#define DBJ_MATMUL_IMPLEMENTATION
-#include "dbj_matmul.h"
+// #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
 #include "ubench.h/ubench.h"
 
+#ifdef __linux__
+#include <x86intrin.h> // #define __SSE__ 1 for SEE versions
+#else
 #include <intrin.h> // #define __SSE__ 1 for SEE versions
+#endif
 
 /////////////////////////////////////////////////////////////////////////
 #define DBJ_MATMUL_IMPLEMENTATION
 #ifdef DBJ_MATMUL_IMPLEMENTATION
 /////////////////////////////////////////////////////////////////////////
-typedef double dbj_matrix_data_type;
+/* NDEBUG == RELEASE */
+#undef NDEBUG
+#include <assert.h>
+
+#define DBJ_MATRIX_SIDE_DIMENSION 99
+
+#undef NOMEM_POLICY
+
+#ifdef NDEBUG 
+
+#define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
+
+#else // ! NDEBUG == DEBUG
+
+#define NOMEM_POLICY( BOOLEXP_ )\
+if (! BOOLEXP_ ) {\
+perror( __FILE__ ", Could not allocate memory!");\
+exit(-1);\
+}
+
+#endif // ! NDEBUG
+
+#undef ALLOC_WITH_POLICY
+#define ALLOC_WITH_POLICY(PTR_ , SIZE_)    \
+do { PTR_ = calloc(1,SIZE_); NOMEM_POLICY(PTR_); } while(0)
+
+#undef DBJ_API
+#define DBJ_API static
+/////////////////////////////////////////////////////////////////////////
+typedef float dbj_matrix_data_type;
 /////////////////////////////////////////////////////////////////////////
 #if __SSE__
 
-DBJ_API dbj_matrix_data_type* simple_mat_transpose(
+DBJ_API void* simple_mat_transpose(
 	const unsigned n_rows, const unsigned n_cols,
 	dbj_matrix_data_type a[static n_rows][n_cols], dbj_matrix_data_type m[static n_cols][n_rows])
 {
@@ -110,10 +138,6 @@ DBJ_API void* SSE_matmul_better(
 #endif // __SSE__
 /////////////////////////////////////////////////////////////////////////
 
-
-#if 0 // --------------------------------------------------------------------------------
-
-
 /*  Takes and returns a new matrix, t, which is a transpose of the original one, m.
 	It's also flat in memory, i.e., 1-D, but it should be looked at as a transpose
 	of m, meaning, rows_t == cols_m, and cols_t == rows_m.
@@ -188,8 +212,6 @@ void init_seq(dbj_matrix_data_type* a, const unsigned rows_a, const unsigned col
 		}
 	}
 }
-
-#endif // 0 --------------------------------------------------------------------------------
 
 DBJ_API void* matmul_surprise(
 	const unsigned a_rows,
@@ -365,4 +387,15 @@ UBENCH(godbolt, SSE_better_matmul) {
 
 /////////////////////////////////////////////////////////////////////////
 
+UBENCH_STATE();
 
+int main(const int argc, const char** argv)
+{
+	(void)argc;
+	(void)argv;
+	// WIN32 hack to kick-start the ANSI ESC codes interpreter
+#ifdef WIN32
+	system(" ");
+#endif
+	return ubench_main(argc, argv);
+}

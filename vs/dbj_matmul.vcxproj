@@ -19,14 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\dbj_matmul.h" />
     <ClInclude Include="..\dbj_matmul_common.h" />
     <ClInclude Include="..\dbj_matmul_omp.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\godbolt.c" />
-    <ClCompile Include="..\main.c" />
-    <ClCompile Include="..\r_and_d\various_simple_matmuls.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
