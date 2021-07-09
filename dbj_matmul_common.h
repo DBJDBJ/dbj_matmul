@@ -184,7 +184,6 @@ static inline void cleanup_free(void* p) {
  * ----------------------------------------------------------------------------------------------------
  */
 #define DBJ_MATRIX_SIDE_DIMENSION 1024
-#define DBJ_MATRIX_DATA_TYPE double
 
  /* NDEBUG == RELEASE */
 #include <assert.h>
