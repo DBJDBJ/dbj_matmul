@@ -1,3 +1,6 @@
+/**********************************************************************************/
+#if 0
+/**********************************************************************************/
 
 #include "../ubench.h/ubench.h"
 
@@ -57,14 +60,13 @@ dbj_simple_matmuls_algo_table[DBJ_MATMUL_API_FUN_ID].function(\
 )
 
 UBENCH(simple, matmul_0) { UBENCH_COMMON_BODY(0); }
-UBENCH(simple, matmul_0_0) { 
-simple_mat_mul_0_0(
-	TMCD_.rows, TMCD_.cols, TMCD_.rows, /* BUG?! */ 
-	TMCD_.mx_data_A , TMCD_.mx_data_B, TMCD_.mx_data_M 
-);
+UBENCH(simple, matmul_0_0) {
+	simple_mat_mul_0_0(
+		TMCD_.rows, TMCD_.cols, TMCD_.rows, /* BUG?! */
+		TMCD_.mx_data_A, TMCD_.mx_data_B, TMCD_.mx_data_M
+	);
 }
 
-#if 0
 
 UBENCH(simple, matmul_1) { UBENCH_COMMON_BODY(2); }
 #if __SSE__
@@ -79,4 +81,6 @@ UBENCH(simple, matmul_5_cblas) { UBENCH_COMMON_BODY(7); }
 UBENCH(simple, matmul_6_cblas) { UBENCH_COMMON_BODY(8); }
 #endif // HAVE_CBLAS
 
+/**********************************************************************************/
 #endif // 0
+/**********************************************************************************/

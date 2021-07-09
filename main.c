@@ -1,11 +1,13 @@
 
+#include "ubench.h/ubench.h"
+
+#if 0 // ---------------------------------------------------------------------------------------
+
 #define DBJ_MATMUL_IMPLEMENTATION
 #include "dbj_matmul.h"
 
 #define DBJ_MATMUL_OMP_IMP
 #include "dbj_matmul_omp.h"
-
-#include "ubench.h/ubench.h"
 
 #undef DBJ_API
 #define DBJ_API __attribute__((const)) static
@@ -65,7 +67,6 @@ UBENCH(dbj_, faster) {
 	dot(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
 
-#if 0
 UBENCH(dbj_, omp_simple) {
 	omp_dot_simple(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
@@ -73,7 +74,7 @@ UBENCH(dbj_, omp_simple) {
 UBENCH(dbj_, omp_faster) {
 	omp_dot_faster(app_data.a, app_data.n_rows_a, app_data.n_cols_a, app_data.b, app_data.n_rows_b, app_data.n_cols_b, app_data.rezult);
 }
-#endif // 0
+#endif // 0 ---------------------------------------------------------------------------------------
 
 UBENCH_STATE();
 

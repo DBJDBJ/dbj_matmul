@@ -185,3 +185,30 @@ static inline void cleanup_free(void* p) {
  */
 #define DBJ_MATRIX_SIDE_DIMENSION 1024
 #define DBJ_MATRIX_DATA_TYPE double
+
+ /* NDEBUG == RELEASE */
+#include <assert.h>
+
+#undef NOMEM_POLICY
+
+#ifdef NDEBUG 
+
+#define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
+
+#else // ! NDEBUG == DEBUG
+
+#define NOMEM_POLICY( BOOLEXP_ )\
+if (! BOOLEXP_ ) {\
+perror( __FILE__ ", Could not allocate memory!");\
+exit(-1);\
+}
+
+#endif // ! NDEBUG
+
+#undef ALLOC_WITH_POLICY
+#define ALLOC_WITH_POLICY(PTR_ , SIZE_)    \
+do { PTR_ = calloc(1,SIZE_); NOMEM_POLICY(PTR_); } while(0)
+
+
+#undef DBJ_API
+#define DBJ_API static
