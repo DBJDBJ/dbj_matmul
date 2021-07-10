@@ -19,7 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\dbj_matmul_common.h" />
     <ClInclude Include="..\dbj_matmul_omp.h" />
   </ItemGroup>
   <ItemGroup>
@@ -106,6 +105,12 @@
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -129,6 +134,12 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -142,6 +153,12 @@
     <Link>
       <AdditionalDependencies>libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -159,6 +176,12 @@
     <Link>
       <AdditionalDependencies>libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>echo #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  &gt; ..\build_time_stamp.inc</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

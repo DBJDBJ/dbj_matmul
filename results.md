@@ -1,5 +1,27 @@
-# DBJ MATMUL BENCHMARKING
+<h1> DBJ*MATMUL</h1>
+<h3> Benchmarking </h3>
+<h3>&nbsp;</h3>
 
+#### (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj/
+
+<h3>&nbsp;</h3>
+
+ This is benchmarking of a collection of matrix multiplication algorithms.
+ Algorithms are kept as simple as possible. No structs are passed as arguments.
+ No "clever" "generic" matrix macros are used.
+
+ Different compliers multiplied with different platforms multiplied by selection
+ of data types  yield a complex picture of benchmarking results.
+
+ > Here is strong hint for you: The simplest algorithm is the fastest. 
+ Keep in mind compiler has the easiest job optimizing the simplest code.
+
+ Use this file to recompile and re measure whenever selecting
+ the right matrix multiplication algorithm
+
+ [Godbolt code is here](https://godbolt.org/z/joMo4Tn3T)
+
+ 
 ## Windows 10 PRO
 
 clang-cl aka clang 10.0.0 release build
@@ -20,6 +42,9 @@ All matrices are square, side size is: 99
 [==========] 6 benchmarks ran.
 [  PASSED  ] 6 benchmarks.
 ```
+
+It seems SSE has the role for large(r)matrices. 
+
 
 ## GODBOLT
 

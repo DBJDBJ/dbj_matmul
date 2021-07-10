@@ -2,19 +2,24 @@
 
  This is benchmarking of a collection of matrix multiplication algorithms.
  Algorithms are kept as simple as possible. No structs are passed as arguments.
+ No "clever" "generic" matrix macros are used
 
  Different comoilers multiplied with different platforms multiplied selection
- of data types  yield a complex picture of
- benchmarking results.
+ of data types  yield a complex picture of benchmarking results.
 
- Use this file to recompile and re measure whenver selecting
+ Although here is strong hint for you: The simplest algorithm is the fastest.
+ Keep in mind compiler has the easiest job optimizing the simplest code.
+
+ Use this file to recompile and re measure whenever selecting
  the right matrix multiplication algorithm
 
  https://godbolt.org/z/joMo4Tn3T
 
+ (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj/
+
  */
 
-
+#include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP 
 
  // #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
 #include "ubench.h/ubench.h"
@@ -27,9 +32,6 @@
 
 /* NDEBUG == RELEASE */
 #include <assert.h>
-/////////////////////////////////////////////////////////////////////////
-#define DBJ_MATMUL_IMPLEMENTATION
-#ifdef DBJ_MATMUL_IMPLEMENTATION
 /////////////////////////////////////////////////////////////////////////
 
 #undef NOMEM_POLICY
@@ -76,18 +78,18 @@ DBJ_API dbj_matrix_data_type simple_sdot_sse
 	for (i = 0; i < n8; i += 8)
 	{
 		__m128 vx1, vx2, vy1, vy2;
-		vx1 = _mm_loadu_ps(&x[i]);
-		vx2 = _mm_loadu_ps(&x[i + 4]);
-		vy1 = _mm_loadu_ps(&y[i]);
-		vy2 = _mm_loadu_ps(&y[i + 4]);
+		vx1 = _mm_loadu_ps((float*)&x[i]);
+		vx2 = _mm_loadu_ps((float*)&x[i + 4]);
+		vy1 = _mm_loadu_ps((float*)&y[i]);
+		vy2 = _mm_loadu_ps((float*)&y[i + 4]);
 		vs1 = _mm_add_ps(vs1, _mm_mul_ps(vx1, vy1));
 		vs2 = _mm_add_ps(vs2, _mm_mul_ps(vx2, vy2));
 	}
 	for (s = 0.0f; i < n; ++i)
 		s += x[i] * y[i];
-	_mm_storeu_ps(t, vs1);
+	_mm_storeu_ps((float*)&s, vs1);
 	s += t[0] + t[1] + t[2] + t[3];
-	_mm_storeu_ps(t, vs2);
+	_mm_storeu_ps((float*)&s, vs2);
 	s += t[0] + t[1] + t[2] + t[3];
 	return s;
 }
@@ -280,11 +282,10 @@ DBJ_API void* matrix_args(
 	}
 	return m;
 }
-/////////////////////////////////////////////////////////////////////////
-#endif // DBJ_MATMUL_IMPLEMENTATION
 
 //////////////////////////////////////////////////////////////////
-// ubench bench functions have no parameters
+
+// ubench functions have no parameters
 // thus we use common data aka globals
 
 static struct app_data_type {
@@ -310,6 +311,12 @@ static struct app_data_type {
 	// the rest is auto zeroed 
 };
 
+// in KB
+DBJ_API unsigned dbj_matrix_size ( const unsigned rows_,const unsigned cols_, size_t data_size_ )
+{
+   return (rows_ * rows_ * (unsigned)data_size_ ) / 1024U ;
+}
+
 __attribute__((constructor)) DBJ_API void app_start(void)
 {
 	assert(app_data.rows_b == app_data.cols_a);
@@ -325,11 +332,18 @@ __attribute__((constructor)) DBJ_API void app_start(void)
 	init_seq(app_data.r, app_data.rows_a, app_data.cols_b);
 
 	printf("\nTesting various matrix multiplication algorithms"
-		"\nAll matrices are square, side size is: %d"
-		"\nData type is: %s\n\n", DBJ_MATRIX_SIDE_DIMENSION, dbj_matrix_data_type_name);
+		"\nTimestamp: %s"
+		"\nAll matrices are : ( %d * %d * sizeof(%s) == %d KB\n",
+		DBJ_BUILD_TIMESTAMP,
+		app_data.rows_a , app_data.cols_a, dbj_matrix_data_type_name,
+		dbj_matrix_size(app_data.rows_a , app_data.cols_a, sizeof(dbj_matrix_data_type) )
+	);
 
 #ifdef WIN32
-	// VT100 ESC
+	// VT100 ESC codes kick-start hack
+	// 2021-07-10
+	// works and necessary 
+	// Microsoft Windows [Version 10.0.19042.1052]
 	system(" ");
 #endif
 }
@@ -394,9 +408,5 @@ int main(const int argc, const char** argv)
 {
 	(void)argc;
 	(void)argv;
-	// WIN32 hack to kick-start the ANSI ESC codes interpreter
-#ifdef WIN32
-	system(" ");
-#endif
 	return ubench_main(argc, argv);
 }
