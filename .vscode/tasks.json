@@ -7,7 +7,9 @@
 			"command": "D:\\PROD\\TDM-GCC-64\\bin\\gcc.exe",
 			"args": [
 				"-s",
-				"-g",
+				/* "-g", */
+				/* "-Wall", */
+				/* "-pedantic", */
 				"${file}",
 				"-o",
 				"${fileDirname}\\${fileBasenameNoExtension}.exe"

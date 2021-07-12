@@ -13,24 +13,77 @@
  Use this file to recompile and re measure whenever selecting
  the right matrix multiplication algorithm
 
- https://godbolt.org/z/joMo4Tn3T
+ https://godbolt.org/z/1KTE3PnEP
 
  (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj/
 
  */
 
-#include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP 
+#define DBJ_BENCHMARKING 1
+#define DBJ_ON_GODBOLT 0
 
- // #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
-#include "ubench.h/ubench.h"
+#pragma region common_trash
 
-#ifdef __linux__
-#include <x86intrin.h> // #define __SSE__ 1 for SEE versions
-#else
-#include <intrin.h> // #define __SSE__ 1 for SEE versions
+#define CLANG_IGNORE_PUSH \
+	_Pragma("clang diagnostic push")                                           \
+		_Pragma("clang diagnostic ignored \"-Wunused-local-typedefs\"")     \
+		_Pragma("clang diagnostic ignored \"-Wunused-variable\"")     \
+		_Pragma("clang diagnostic ignored \"-Wunused-parameter\"")     \
+		_Pragma("clang diagnostic ignored \"-Wlanguage-extension-token\"")     \
+		_Pragma("clang diagnostic ignored \"-Wfloat-equal\"")          
+
+#define CLANG_IGNORE_POP _Pragma("clang diagnostic pop")
+
+#ifndef thread_local
+# if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
+#  define thread_local _Thread_local
+# elif defined _WIN32 && ( \
+	   defined _MSC_VER || \
+	   defined __ICL || \
+	   defined __DMC__ || \
+	   defined __BORLANDC__ )
+#  define thread_local __declspec(thread) 
+ /* note that ICC (linux) and Clang are covered by __GNUC__ */
+# elif defined __GNUC__ || \
+	   defined __SUNPRO_C || \
+	   defined __xlC__
+#  define thread_local __thread
+# else
+#  error "Cannot define thread_local"
+# endif
 #endif
 
-/* NDEBUG == RELEASE */
+ //#ifdef __STDC_NO_ATOMICS__
+ //#error Please use C11 or better with ATOMICS
+ //#else
+ //#include <stdatomic.h>
+ //#endif
+
+#define DBJ_SWAP(x,y) do {\
+typeof(x) T_ = x;      \
+x = y;                 \
+y = T_;                \
+ } while (0)
+
+#if ! DBJ_ON_GODBOLT
+#include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP 
+#   if DBJ_BENCHMARKING
+#include "ubench.h/ubench.h"
+#else
+#   include "utest.h/utest.h"
+#endif  // ! DBJ_BENCHMARKING
+
+#else // on godbolt
+#   if DBJ_BENCHMARKING
+#include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
+#else
+#   include "https://raw.githubusercontent.com/sheredom/utest.h/master/utest.h"
+#endif  // ! DBJ_BENCHMARKING
+#define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  
+#endif
+
+
+ /* NDEBUG == RELEASE */
 #include <assert.h>
 /////////////////////////////////////////////////////////////////////////
 
@@ -42,147 +95,154 @@
 #define NOMEM_POLICY( BOOLEXP_ ) if (! BOOLEXP_ ) { perror( __FILE__ ", Could not allocate memory!"); exit(-1); }
 #endif // ! NDEBUG
 
-#undef ALLOC_WITH_POLICY
-#define ALLOC_WITH_POLICY(PTR_ , SIZE_)  do { PTR_ = calloc(1,SIZE_); NOMEM_POLICY(PTR_); } while(0)
+// for when we are sure ARR is the array
+#define DBJ_CNT(ARR) ( sizeof(ARR) / sizeof(ARR[0]) )
+
+#undef MALLOC_WITH_POLICY
+#define MALLOC_WITH_POLICY(PTR_ , SIZE_)  do { PTR_ = malloc( SIZE_); NOMEM_POLICY(PTR_); } while(0)
+
+#undef CALLOC_WITH_POLICY
+#define CALLOC_WITH_POLICY(PTR_ ,R_,C_, SIZE_)  do { PTR_ = calloc(R_ * C_, SIZE_); NOMEM_POLICY(PTR_); } while(0)
+
+#define DBJ_FREE(P_) do { if (P_){ free(P_); P_ = NULL; }  }while(0)
+
+#if (defined(__clang__) || defined(__GNUC__))
+#define DBJ_CLANGNUC (1==1)
+#else
+#define DBJ_CLANGNUC (1==0)
+#endif
+
+#if DBJ_CLANGNUC
+#define DBJ_CTOR __attribute__((constructor)) 
+#define DBJ_DTOR __attribute__((destructor)) 
+#else
+#define DBJ_CTOR 
+#define DBJ_DTOR 
+#endif
+
 
 #undef DBJ_API
 #define DBJ_API static
+
+#pragma endregion // common_trash
+
+#pragma region common data 
 /////////////////////////////////////////////////////////////////////////
+// dimensions
+#if DBJ_BENCHMARKING
+
+// NOTE: here we use stack based matrices , thus be carefull with sizes
+//       UBENCH repeats execution so matrix size is not the prevailing factor
+#define DBJ_MX_A_ROWS 0xF
+#define DBJ_MX_A_COLS 0xFF
+#define DBJ_MX_B_ROWS DBJ_MX_A_COLS
+#define DBJ_MX_B_COLS 0xF
+
+#else // testing
+	/*
+	 *     ! 1 2 |      | 5 6 |       | 19 22 |
+	 *     |     |  x   |     |  =    |       |
+	 *     | 3 4 |      | 7 8 |       | 43 50 |
+	 */
+#define DBJ_MX_A_ROWS 2
+#define DBJ_MX_A_COLS 2
+#define DBJ_MX_B_ROWS DBJ_MX_A_COLS
+#define DBJ_MX_B_COLS 2
+
+#endif // testing
+
+#define DBJ_MX_R_ROWS DBJ_MX_A_ROWS
+#define DBJ_MX_R_COLS DBJ_MX_B_COLS  
+
+static_assert(DBJ_MX_A_COLS == DBJ_MX_B_ROWS, "DBJ_MX_A_COLS != DBJ_MX_B_ROWS");
+static_assert(DBJ_MX_A_ROWS == DBJ_MX_R_ROWS, "DBJ_MX_A_ROWS != DBJ_MX_R_ROWS");
+static_assert(DBJ_MX_B_COLS == DBJ_MX_R_COLS, "DBJ_MX_B_COLS != DBJ_MX_R_COLS");
 
 typedef double dbj_matrix_data_type;
 #define dbj_matrix_data_type_name "double"
 
-#define DBJ_MATRIX_SIDE_DIMENSION 0xFF
+// NOTE: these are compile time typedefs 
+// we can create them if we do not use Variably Modified Types (VMT)
 
-/////////////////////////////////////////////////////////////////////////
-#if __SSE__
+typedef dbj_matrix_data_type(*dbj_mx_a_pointer)[DBJ_MX_A_COLS][DBJ_MX_A_ROWS];
+typedef dbj_matrix_data_type(*dbj_mx_b_pointer)[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
+typedef dbj_matrix_data_type(*dbj_mx_r_pointer)[DBJ_MX_R_COLS][DBJ_MX_R_ROWS];
 
-DBJ_API void* simple_mat_transpose(
-	const unsigned n_rows, const unsigned n_cols,
-	dbj_matrix_data_type a[static n_rows][n_cols], dbj_matrix_data_type m[static n_cols][n_rows])
-{
-	for (unsigned i = 0; i < n_rows; ++i)
-		for (unsigned j = 0; j < n_cols; ++j)
-			m[j][i] = a[i][j];
-	return m;
-}
+typedef dbj_matrix_data_type(*dbj_mx_a_row)[DBJ_MX_A_COLS];
+typedef dbj_matrix_data_type(*dbj_mx_b_row)[DBJ_MX_B_COLS];
+typedef dbj_matrix_data_type(*dbj_mx_r_row)[DBJ_MX_R_COLS];
 
-DBJ_API dbj_matrix_data_type simple_sdot_sse
-(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
-{
-	int i, n8 = n >> 3 << 3;
-	__m128 vs1, vs2;
-	dbj_matrix_data_type s, t[4];
-	vs1 = _mm_setzero_ps();
-	vs2 = _mm_setzero_ps();
-	for (i = 0; i < n8; i += 8)
-	{
-		__m128 vx1, vx2, vy1, vy2;
-		vx1 = _mm_loadu_ps((float*)&x[i]);
-		vx2 = _mm_loadu_ps((float*)&x[i + 4]);
-		vy1 = _mm_loadu_ps((float*)&y[i]);
-		vy2 = _mm_loadu_ps((float*)&y[i + 4]);
-		vs1 = _mm_add_ps(vs1, _mm_mul_ps(vx1, vy1));
-		vs2 = _mm_add_ps(vs2, _mm_mul_ps(vx2, vy2));
-	}
-	for (s = 0.0f; i < n; ++i)
-		s += x[i] * y[i];
-	_mm_storeu_ps((float*)&s, vs1);
-	s += t[0] + t[1] + t[2] + t[3];
-	_mm_storeu_ps((float*)&s, vs2);
-	s += t[0] + t[1] + t[2] + t[3];
-	return s;
-}
+#pragma endregion // common data 
 
-DBJ_API void* SSE_matmul_simpler(
-	const unsigned n_a_rows,
-	const unsigned n_a_cols,
-	const unsigned n_b_cols,
-	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
-	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
-	dbj_matrix_data_type m[static n_a_rows][n_b_cols])
-{
-	const unsigned n_b_rows = n_a_cols;
+#pragma region matrix functions and various matmuls
 
-	dbj_matrix_data_type* Temp; ALLOC_WITH_POLICY(Temp, n_b_cols * n_b_rows * sizeof(dbj_matrix_data_type));
-	// Temp rows and cols are inverted !
-	typedef dbj_matrix_data_type(*matrix)[n_b_rows];
-	matrix bT = (matrix)Temp;
-	(void)simple_mat_transpose(n_b_rows, n_b_cols, b, bT);
-
-	for (unsigned i = 0; i < n_a_rows; ++i)
-		for (unsigned j = 0; j < n_b_cols; ++j)
-			m[i][j] = simple_sdot_sse(n_a_cols, a[i], bT[j]);
-	free(Temp);
-	return m;
-}
-
-DBJ_API void* SSE_matmul_better(
-	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
-	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
-	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
-	dbj_matrix_data_type m[static n_a_rows][n_b_cols])
-{
-	const unsigned x = 16, n_b_rows = n_a_cols;
-
-	dbj_matrix_data_type* Temp; ALLOC_WITH_POLICY(Temp, n_b_cols * n_b_rows * sizeof(dbj_matrix_data_type));
-	// Temp rows and cols are inverted !
-	typedef dbj_matrix_data_type(*matrix)[n_b_rows];
-	matrix bT = (matrix)Temp;
-	(void)simple_mat_transpose(n_b_rows, n_b_cols, b, bT);
-
-	for (unsigned i = 0; i < n_a_rows; i += x)
-	{
-		for (unsigned j = 0; j < n_b_cols; j += x)
-		{
-			unsigned je = n_b_cols < j + x ? n_b_cols : j + x;
-			unsigned ie = n_a_rows < i + x ? n_a_rows : i + x;
-			for (unsigned ii = i; ii < ie; ++ii)
-				for (unsigned jj = j; jj < je; ++jj)
-					m[ii][jj] += simple_sdot_sse(n_a_cols, a[ii], bT[jj]);
+DBJ_API void* matrix_arr_init
+(dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a) {
+	for (unsigned i = 0; i < rows_a; i++) {
+		for (unsigned j = 0; j < cols_a; j++) {
+			a[i * cols_a + j] = (dbj_matrix_data_type)(i * cols_a + j);
 		}
 	}
-	free(Temp);
-	return m;
+	return a;
 }
 
-#endif // __SSE__
-/////////////////////////////////////////////////////////////////////////
+DBJ_API float dbj_matrix_size_in_bytes(const unsigned rows_, const unsigned cols_, size_t data_size_)
+{
+	return (rows_ * cols_ * (unsigned)data_size_);
+}
 
-/*  Takes and returns a new matrix, t, which is a transpose of the original one, m.
-	It's also flat in memory, i.e., 1-D, but it should be looked at as a transpose
-	of m, meaning, rows_t == cols_m, and cols_t == rows_m.
-	The original matrix m stays intact. */
-DBJ_API
-dbj_matrix_data_type* transpose(
-	const dbj_matrix_data_type* m,
+/*  Takes and returns a new matrix, t, which is a dbj_matrix_transpose of the original one, m.
+   It's also flat in memory, i.e., 1-D, but it should be looked at as a matrix
+   of m, meaning, rows_t == cols_m, and cols_t == rows_m.
+   The original matrix m stays intact.
+
+   NOTE: VMT make this much safr, but no VMT here
+*/
+DBJ_API void* dbj_matrix_transpose(
 	const unsigned rows_m, const unsigned cols_m,
-	dbj_matrix_data_type* t) {
+	const dbj_matrix_data_type* m,
+	dbj_matrix_data_type* t)
+{
 	for (size_t i = 0; i < rows_m; i++) {
 		for (size_t j = 0; j < cols_m; j++) {
 			t[j * rows_m + i] = m[i * cols_m + j];
 		}
 	}
-
 	return t;
 }
 
-/* Dot product of two arrays, or matrix product
- * Allocates and returns an array.
- * This variant doesn't transpose matrix b, and it's a lot slower. */
-DBJ_API
-dbj_matrix_data_type* array1d_first(const dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a,
-	const dbj_matrix_data_type* b, const unsigned rows_b, const unsigned cols_b, dbj_matrix_data_type* c) {
-
-	assert(cols_a == rows_b);
-
-	for (size_t i = 0; i < rows_a; i++) {
-		for (size_t k = 0; k < cols_b; k++) {
-			dbj_matrix_data_type sum = 0.0;
-			for (size_t j = 0; j < cols_a; j++) {
-				sum += a[i * cols_a + j] * b[j * cols_b + k];
+// text bool matmul with VMT arguments
+// rezult matrix m is sent in as pre allocated
+// notice the dimensions requirements for a,b, and m
+DBJ_API void* matmul_row_pointers
+(
+	dbj_mx_a_row a, dbj_mx_b_row b, dbj_mx_r_row m
+)
+{
+	for (unsigned c = 0; c < DBJ_MX_A_ROWS; c++) {
+		for (unsigned d = 0; d < DBJ_MX_B_COLS; d++) {
+			for (unsigned k = 0; k < DBJ_MX_B_ROWS; k++) {
+				m[c][d] += a[c][k] * b[k][d];
 			}
-			c[i * cols_b + k] = sum;
+		}
+	}
+	return m;
+}
+
+/*
+ use 1D aray as matrix type + index calculation of "matrix" [row][col]
+ */
+DBJ_API dbj_matrix_data_type* matmul_mx_as_array
+(dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c)
+{
+
+	for (size_t i = 0; i < DBJ_MX_A_ROWS; i++) {
+		for (size_t k = 0; k < DBJ_MX_B_COLS; k++) {
+			dbj_matrix_data_type sum = (dbj_matrix_data_type)0.0;
+			for (size_t j = 0; j < DBJ_MX_B_ROWS; j++) {
+				sum += a[i * DBJ_MX_A_COLS + j] * b[j * DBJ_MX_B_COLS + k];
+			}
+			c[i * DBJ_MX_B_COLS + k] = sum;
 		}
 	}
 
@@ -193,102 +253,33 @@ dbj_matrix_data_type* array1d_first(const dbj_matrix_data_type* a, const unsigne
  * Allocates and returns an array.
  * This variant transposes matrix b, and it's a lot faster. */
 DBJ_API
-dbj_matrix_data_type* array1d_second(const dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a,
-	const dbj_matrix_data_type* b, const unsigned rows_b, const unsigned cols_b, dbj_matrix_data_type* c) {
+dbj_matrix_data_type* matmul_mx_as_array_faster
+(dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c)
+{
 
-	assert(cols_a == rows_b);
+	dbj_matrix_data_type bt[DBJ_MX_A_ROWS * DBJ_MX_B_COLS] = { (dbj_matrix_data_type)0 };
 
-	dbj_matrix_data_type* bt = 0;
-	ALLOC_WITH_POLICY(bt, rows_b * cols_b * sizeof(*b));
+	dbj_matrix_transpose(DBJ_MX_A_ROWS, DBJ_MX_B_COLS, b, bt);
 
-	bt = transpose(b, rows_b, cols_b, bt);
-
-	for (unsigned i = 0; i < rows_a; i++) {
-		for (unsigned k = 0; k < cols_b; k++) {
+	for (unsigned i = 0; i < DBJ_MX_A_ROWS; i++) {
+		for (unsigned k = 0; k < DBJ_MX_B_COLS; k++) {
 			dbj_matrix_data_type sum = 0.0;
-			for (unsigned j = 0; j < cols_a; j++) {
-				sum += a[i * cols_a + j] * bt[k * rows_b + j];
+			for (unsigned j = 0; j < DBJ_MX_A_COLS; j++) {
+				sum += a[i * DBJ_MX_A_COLS + j] * bt[k * DBJ_MX_B_COLS + j];
 			}
-			c[i * cols_b + k] = sum;
+			c[i * DBJ_MX_B_COLS + k] = sum;
 		}
 	}
 	return c;
 }
 
-DBJ_API
-void init_seq(dbj_matrix_data_type* a, const unsigned rows_a, const unsigned cols_a) {
-	for (unsigned i = 0; i < rows_a; i++) {
-		for (unsigned j = 0; j < cols_a; j++) {
-			a[i * cols_a + j] = (dbj_matrix_data_type)(i * cols_a + j);
-		}
-	}
-}
+#pragma endregion // matrix functions and various matmuls
 
-DBJ_API void* array_ptr_args(
-	const unsigned a_rows,
-	const unsigned cols_a,
-	const unsigned b_rows,
-	const unsigned b_cols,
-	const unsigned c_rows,
-	const unsigned c_cols,
-	dbj_matrix_data_type(*ax)[cols_a],
-	dbj_matrix_data_type(*bx)[b_cols],
-	dbj_matrix_data_type(*mx)[c_cols])
-{
-	assert(b_rows == cols_a);
-	assert(a_rows == c_rows);
-	assert(b_cols == c_cols);
-
-	// VMT is runtime mechanism
-	// runtime casting takes time
-	// matridbj_x_data_type *ax)[a_cols] = a;
-	// matridbj_x_data_type *bx)[b_cols] = b;
-	// matridbj_x_data_type *mx)[b_rows] = m;
-
-	for (unsigned i = 0; i < a_rows; ++i)
-	{
-		for (unsigned j = 0; j < b_cols; ++j)
-		{
-			dbj_matrix_data_type t = 0.0;
-			for (unsigned k = 0; k < cols_a; ++k)
-				t += ax[i][k] * bx[k][j];
-			mx[i][j] = t;
-		}
-	}
-	return mx;
-}
-
-DBJ_API void* matrix_args(
-	const unsigned a_rows, const unsigned a_cols,
-	const unsigned b_rows, const unsigned b_cols,
-	const unsigned m_rows, const unsigned m_cols,
-	dbj_matrix_data_type a[static a_rows][a_cols],
-	dbj_matrix_data_type b[static b_rows][b_cols],
-	dbj_matrix_data_type m[static m_rows][m_cols])
-{
-	assert(b_rows == a_cols);
-	assert(a_rows == m_rows);
-	assert(b_cols == m_cols);
-
-	for (unsigned i = 0; i < a_rows; ++i)
-	{
-		for (unsigned j = 0; j < b_cols; ++j)
-		{
-			dbj_matrix_data_type t = 0.0;
-			for (unsigned k = 0; k < a_cols; ++k)
-				t += a[i][k] * b[k][j];
-			m[i][j] = t;
-		}
-	}
-	return m;
-}
-
-//////////////////////////////////////////////////////////////////
+#pragma region common for testing or benchmarking
 
 // ubench functions have no parameters
 // thus we use common data aka globals
-
-static struct app_data_type {
+typedef struct {
 
 	const unsigned rows_a;
 	const unsigned cols_a;
@@ -297,108 +288,100 @@ static struct app_data_type {
 	const unsigned rows_r;
 	const unsigned cols_r;
 	// the matrixes
-	dbj_matrix_data_type* a;
-	dbj_matrix_data_type* b;
-	dbj_matrix_data_type* r; /* rezult size is a rows * b cols */
+	dbj_matrix_data_type a[DBJ_MX_A_ROWS * DBJ_MX_A_COLS];
+	dbj_matrix_data_type b[DBJ_MX_B_ROWS * DBJ_MX_B_COLS];
+	dbj_matrix_data_type r[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]; /* rezult size is a rows * b cols */
 
-} app_data = {
-	.rows_a = DBJ_MATRIX_SIDE_DIMENSION ,
-	.cols_a = DBJ_MATRIX_SIDE_DIMENSION ,
-	.rows_b = DBJ_MATRIX_SIDE_DIMENSION ,
-	.cols_b = DBJ_MATRIX_SIDE_DIMENSION ,
-	.rows_r = DBJ_MATRIX_SIDE_DIMENSION , /* A rows */
-	.cols_r = DBJ_MATRIX_SIDE_DIMENSION   /* B cols */
+} app_data_type;
+
+DBJ_API app_data_type app_data = {
+	.rows_a = DBJ_MX_A_ROWS ,
+	.cols_a = DBJ_MX_A_COLS ,
+	.rows_b = DBJ_MX_B_ROWS ,
+	.cols_b = DBJ_MX_B_COLS ,
+	.rows_r = DBJ_MX_A_ROWS , /* the result */
+	.cols_r = DBJ_MX_B_COLS ,
 	// the rest is auto zeroed 
+	#if !DBJ_BENCHMARKING
+	// testing data 
+	{ 1,2,3,4 },
+	{ 5,6,7,8 },
+	{ 0,0,0,0 }
+	#endif // !DBJ_BENCHMARKING
 };
 
-// in KB
-DBJ_API unsigned dbj_matrix_size ( const unsigned rows_,const unsigned cols_, size_t data_size_ )
+DBJ_API void app_start(void)
 {
-   return (rows_ * rows_ * (unsigned)data_size_ ) / 1024U ;
-}
+#if DBJ_BENCHMARKING
 
-__attribute__((constructor)) DBJ_API void app_start(void)
-{
-	assert(app_data.rows_b == app_data.cols_a);
-	assert(app_data.rows_a == app_data.rows_r);
-	assert(app_data.cols_b == app_data.cols_r);
+#define DBJ_APP_KIND  "BENCHMARKING"
 
-	ALLOC_WITH_POLICY(app_data.a, app_data.rows_a * app_data.cols_a * sizeof(*app_data.a));
-	ALLOC_WITH_POLICY(app_data.b, app_data.rows_b * app_data.cols_b * sizeof(*app_data.b));
-	ALLOC_WITH_POLICY(app_data.r, app_data.rows_a * app_data.cols_b * sizeof(*app_data.r));
+	matrix_arr_init(app_data.a, app_data.rows_a, app_data.cols_a);
+	matrix_arr_init(app_data.b, app_data.rows_b, app_data.cols_b);
+	matrix_arr_init(app_data.r, app_data.rows_a, app_data.cols_b);
 
-	init_seq(app_data.a, app_data.rows_a, app_data.cols_a);
-	init_seq(app_data.b, app_data.rows_b, app_data.cols_b);
-	init_seq(app_data.r, app_data.rows_a, app_data.cols_b);
+#else // TESTING 
 
-	printf("\nTesting various matrix multiplication algorithms"
-		"\nTimestamp: %s"
-		"\nAll matrices are : ( %d * %d * sizeof(%s) == %d KB\n",
-		DBJ_BUILD_TIMESTAMP,
-		app_data.rows_a , app_data.cols_a, dbj_matrix_data_type_name,
-		dbj_matrix_size(app_data.rows_a , app_data.cols_a, sizeof(dbj_matrix_data_type) )
+#define DBJ_APP_KIND  "TESTING"
+
+	/*
+	 *     ! 1 2 |      | 5 6 |       | 19 22 |
+	 *     |     |  x   |     |  =    |       |
+	 *     | 3 4 |      | 7 8 |       | 43 50 |
+	 */
+	assert(app_data.rows_a * app_data.cols_a == 4);
+	assert(app_data.rows_b * app_data.cols_b == 4);
+	assert(app_data.rows_r * app_data.cols_r == 4);
+
+#endif // ! DBJ_BENCHMARKING
+
+	fprintf(stderr, "\n\n" DBJ_APP_KIND " various matrix multiplication algorithms"
+		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj , timestamp: %s"
+		"\nMatrices are\n"
+		"\nA : %d * %d * sizeof(%s) == %.2f KB"
+		"\nB : %d * %d * sizeof(%s) == %.2f KB"
+		"\nR : %d * %d * sizeof(%s) == %.2f KB\n\n"
+		, DBJ_BUILD_TIMESTAMP,
+		app_data.rows_a, app_data.cols_a, dbj_matrix_data_type_name, dbj_matrix_size_in_bytes(app_data.rows_a, app_data.cols_a, sizeof(dbj_matrix_data_type)) / 1024.0f,
+		app_data.rows_b, app_data.cols_b, dbj_matrix_data_type_name, dbj_matrix_size_in_bytes(app_data.rows_b, app_data.cols_b, sizeof(dbj_matrix_data_type)) / 1024.0f,
+		app_data.rows_r, app_data.cols_r, dbj_matrix_data_type_name, dbj_matrix_size_in_bytes(app_data.rows_r, app_data.cols_r, sizeof(dbj_matrix_data_type)) / 1024.0f
 	);
-
-#ifdef WIN32
-	// VT100 ESC codes kick-start hack
-	// 2021-07-10
-	// works and necessary 
-	// Microsoft Windows [Version 10.0.19042.1052]
-	system(" ");
-#endif
+#undef DBJ_APP_KIND	
 }
 
-__attribute__((destructor)) DBJ_API void app_end(void)
+DBJ_API void app_end(void)
 {
-	free(app_data.a);
-	free(app_data.b);
-	free(app_data.r);
+
 }
 /////////////////////////////////////////////////////////////////////////
 
-UBENCH(matmul, array1d_first) {
-	array1d_first(app_data.a, app_data.rows_a, app_data.cols_a, app_data.b, app_data.rows_b, app_data.cols_b, app_data.r);
-}
+#if DBJ_BENCHMARKING
 
-UBENCH(matmul, array1d_second) {
-	array1d_second(app_data.a, app_data.rows_a, app_data.cols_a, app_data.b, app_data.rows_b, app_data.cols_b, app_data.r);
-}
+// rezult reset and checking are done in UTEST's, see bellow
 
-UBENCH(matmul, array_ptr_args) {
-	array_ptr_args(
-		app_data.rows_a,
-		app_data.cols_a,
-		app_data.rows_b,
-		app_data.cols_b,
-		app_data.rows_r,
-		app_data.cols_r,
+UBENCH(matmul, matmul_mx_as_array_faster) {
+	matmul_mx_as_array_faster(
 		(void*)app_data.a,
 		(void*)app_data.b,
-		(void*)app_data.r);
+		(void*)app_data.r
+	);
 }
 
-UBENCH(matmul, matrix_args) {
-	matrix_args(
-		app_data.rows_a, app_data.cols_a, app_data.rows_b, app_data.cols_b,
-		app_data.rows_r, app_data.cols_r, (void*)app_data.a,
-		(void*)app_data.b, (void*)app_data.r);
+UBENCH(matmul, matmul_mx_as_array) {
+	matmul_mx_as_array(
+		(void*)app_data.a,
+		(void*)app_data.b,
+		(void*)app_data.r
+	);
 }
 
-#if __SSE__
-
-UBENCH(matmul, SSE_simpler) {
-	SSE_matmul_simpler(
-		app_data.rows_a, app_data.cols_a, app_data.cols_b, (void*)app_data.a,
-		(void*)app_data.b, (void*)app_data.r);
+UBENCH(matmul, matmul_row_ptr) {
+	matmul_row_pointers(
+		(void*)app_data.a,
+		(void*)app_data.b,
+		(void*)app_data.r
+	);
 }
-
-UBENCH(matmul, SSE_better) {
-	SSE_matmul_better(
-		app_data.rows_a, app_data.cols_a, app_data.cols_b,
-		(void*)app_data.a, (void*)app_data.b, (void*)app_data.r);
-}
-
-#endif // __SSE__
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -406,7 +389,94 @@ UBENCH_STATE();
 
 int main(const int argc, const char** argv)
 {
-	(void)argc;
-	(void)argv;
+#ifdef WIN32
+	// VT100 ESC codes kick-start hack
+	// 2021-07-10
+	// works and necessary 
+	// Microsoft Windows [Version 10.0.19042.1052]
+	system(" ");
+#endif
+	app_start();
 	return ubench_main(argc, argv);
+	app_end();
 }
+
+#else // testing /////////////////////////////////////////////////////
+/*
+ *     ! 1 2 |      | 5 6 |       | 19 22 |
+ *     |     |  x   |     |  =    |       |
+ *     | 3 4 |      | 7 8 |       | 43 50 |
+ */
+#define check_test_input() \
+do {\
+	EXPECT_EQ(app_data.a[0] , (dbj_matrix_data_type)1);\
+	EXPECT_EQ(app_data.a[1] , (dbj_matrix_data_type)2);\
+	EXPECT_EQ(app_data.a[2] , (dbj_matrix_data_type)3);\
+	EXPECT_EQ(app_data.a[3] , (dbj_matrix_data_type)4);\
+\
+	EXPECT_EQ(app_data.b[0] , (dbj_matrix_data_type)5);\
+	EXPECT_EQ(app_data.b[1] , (dbj_matrix_data_type)6);\
+	EXPECT_EQ(app_data.b[2] , (dbj_matrix_data_type)7);\
+	EXPECT_EQ(app_data.b[3] , (dbj_matrix_data_type)8);\
+} while(0)
+
+#define check_test_result() \
+do {\
+	EXPECT_EQ(app_data.r[0] , (dbj_matrix_data_type)19);\
+	EXPECT_EQ(app_data.r[1] , (dbj_matrix_data_type)22);\
+	EXPECT_EQ(app_data.r[2] , (dbj_matrix_data_type)43);\
+	EXPECT_EQ(app_data.r[3] , (dbj_matrix_data_type)50);\
+} while(0)
+
+
+#define reset_test_result() do { \
+for (unsigned k = 0; k < (DBJ_MX_R_COLS * DBJ_MX_R_ROWS); ++k) app_data.r[k] = (dbj_matrix_data_type)0; \
+} while (0)
+
+UTEST(matmul, matmul_mx_as_array_faster) {
+	reset_test_result();
+	matmul_mx_as_array_faster(
+		(void*)app_data.a,
+		(void*)app_data.b,
+		(void*)app_data.r
+	);
+	check_test_result();
+}
+
+UTEST(matmul, matmul_mx_as_array) {
+	reset_test_result();
+	matmul_mx_as_array(
+		(void*)app_data.a,
+		(void*)app_data.b,
+		(void*)app_data.r
+	);
+	check_test_result();
+}
+
+UTEST(matmul, matmul_row_ptr) {
+	reset_test_result();
+	matmul_row_pointers(
+		(void*)app_data.a,
+		(void*)app_data.b,
+		(void*)app_data.r
+	);
+	check_test_result();
+}
+
+UTEST_STATE();
+int main(int argc, const char* const argv[]) {
+#ifdef WIN32
+	// VT100 ESC codes kick-start hack
+	// 2021-07-10
+	// works and necessary 
+	// Microsoft Windows [Version 10.0.19042.1052]
+	system(" ");
+#endif
+	app_start();
+	return utest_main(argc, argv);
+	app_end();
+}
+
+#endif // ! DBJ_BENCHMARKING
+
+#pragma endregion // common for testing or benchmarking

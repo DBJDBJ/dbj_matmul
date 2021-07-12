@@ -17,13 +17,17 @@
 :build
 @rem obviously you know /Zi makes it a debug build
 @rem and you know /MDd is dll runtime lib debug version
-clang-cl /openmp /TC /MDd /Zi main.c /o out/test.exe
+~rem clang-cl /openmp /TC /MDd /Zi godbolt.c /o out/dbj_matmul_clang_debug.exe
+clang-cl /MD godbolt.c /o out/dbj_matmul_clang_release.exe
 @goto exit
 
 :clean
 @del out\*.pdb
 @del out\*.ilk
 @del out\*.exe
+@del *.pdb
+@del *.ilk
+@del *.exe
 @del r_and_d\*.pdb
 @del r_and_d\*.ilk
 @del r_and_d\*.exe
