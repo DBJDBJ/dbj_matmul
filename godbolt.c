@@ -24,12 +24,16 @@
 
 #pragma region common_trash
 
-#define CLANG_IGNORE_PUSH \
-	_Pragma("clang diagnostic push")                                           \
+#define DBJ_VT_RESET "\033[0m"
+#define DBJ_VT_GREEN "\033[32m"
+#define DBJ_VT_RED   "\033[31m"
+
+#define CLANG_IGNORE_PUSH                                                   \
+	_Pragma("clang diagnostic push")                                        \
 		_Pragma("clang diagnostic ignored \"-Wunused-local-typedefs\"")     \
-		_Pragma("clang diagnostic ignored \"-Wunused-variable\"")     \
-		_Pragma("clang diagnostic ignored \"-Wunused-parameter\"")     \
-		_Pragma("clang diagnostic ignored \"-Wlanguage-extension-token\"")     \
+		_Pragma("clang diagnostic ignored \"-Wunused-variable\"")           \
+		_Pragma("clang diagnostic ignored \"-Wunused-parameter\"")          \
+		_Pragma("clang diagnostic ignored \"-Wlanguage-extension-token\"")  \
 		_Pragma("clang diagnostic ignored \"-Wfloat-equal\"")          
 
 #define CLANG_IGNORE_POP _Pragma("clang diagnostic pop")
@@ -211,6 +215,35 @@ DBJ_API void* dbj_matrix_transpose(
 	return t;
 }
 
+DBJ_API dbj_matrix_data_type sdot_1
+(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
+{
+	dbj_matrix_data_type s = (dbj_matrix_data_type)0;
+	for (int i = 0; i < n; ++i) s += x[i] * y[i];
+	return s;
+}
+
+DBJ_API dbj_matrix_data_type sdot_8
+(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
+{
+	int i, n8 = n >> 3 << 3;
+	dbj_matrix_data_type s = (dbj_matrix_data_type)0, t[8] = { (dbj_matrix_data_type)0 };
+	// t[0] = t[1] = t[2] = t[3] = t[4] = t[5] = t[6] = t[7] = 0.0f;
+	for (i = 0; i < n8; i += 8) {
+		t[0] += x[i + 0] * y[i + 0];
+		t[1] += x[i + 1] * y[i + 1];
+		t[2] += x[i + 2] * y[i + 2];
+		t[3] += x[i + 3] * y[i + 3];
+		t[4] += x[i + 4] * y[i + 4];
+		t[5] += x[i + 5] * y[i + 5];
+		t[6] += x[i + 6] * y[i + 6];
+		t[7] += x[i + 7] * y[i + 7];
+	}
+	for (s = (dbj_matrix_data_type)0; i < n; ++i) s += x[i] * y[i];
+	s += t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7];
+	return s;
+}
+
 // text bool matmul with VMT arguments
 // rezult matrix m is sent in as pre allocated
 // notice the dimensions requirements for a,b, and m
@@ -272,6 +305,46 @@ dbj_matrix_data_type* matmul_mx_as_array_faster
 	}
 	return c;
 }
+// this is VMT basec
+DBJ_API void* matmul_transpose_sdot(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
+	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
+	dbj_matrix_data_type m[static n_a_rows][n_b_cols]
+)
+{
+	int  n_b_rows = n_a_cols;
+
+	// variable-sized object may not be initialized
+	dbj_matrix_data_type bt[n_a_rows][n_b_cols];
+
+	dbj_matrix_transpose(n_a_rows, n_b_cols, b, bt);
+
+	for (unsigned i = 0; i < n_a_rows; ++i)
+		for (unsigned j = 0; j < n_b_cols; ++j)
+			m[i][j] = sdot_8(n_a_cols, a[i], bt[j]);
+	return m;
+}
+
+DBJ_API void* matmul_transpose_sdot_faster(
+	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
+	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
+	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
+	dbj_matrix_data_type m[static n_a_rows][n_b_cols]
+)
+{
+	int n_b_rows = n_a_cols;
+
+	// variable-sized object may not be initialized
+	dbj_matrix_data_type bT[n_a_rows][n_b_cols];
+	dbj_matrix_transpose(n_a_rows, n_b_cols, b, bT);
+
+	for (unsigned i = 0; i < n_a_rows; ++i)
+		for (unsigned j = 0; j < n_b_cols; ++j)
+			m[i][j] = sdot_1(n_a_cols, a[i], bT[j]);
+	return m;
+}
+
 
 #pragma endregion // matrix functions and various matmuls
 
@@ -335,12 +408,12 @@ DBJ_API void app_start(void)
 
 #endif // ! DBJ_BENCHMARKING
 
-	fprintf(stderr, "\n\n" DBJ_APP_KIND " various matrix multiplication algorithms"
-		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj , timestamp: %s"
-		"\nMatrices are\n"
-		"\nA : %d * %d * sizeof(%s) == %.2f KB"
-		"\nB : %d * %d * sizeof(%s) == %.2f KB"
-		"\nR : %d * %d * sizeof(%s) == %.2f KB\n\n"
+	fprintf(stderr, "\n\n" DBJ_VT_RED DBJ_APP_KIND DBJ_VT_RESET " various matrix multiplication algorithms"
+		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj \nTimestamp: %s"
+		"\n\nMatrices are\n"
+		"\nA :%4d * %4d * sizeof(%s) == %4.2f KB"
+		"\nB :%4d * %4d * sizeof(%s) == %4.2f KB"
+		"\nR :%4d * %4d * sizeof(%s) == %4.2f KB\n\n"
 		, DBJ_BUILD_TIMESTAMP,
 		app_data.rows_a, app_data.cols_a, dbj_matrix_data_type_name, dbj_matrix_size_in_bytes(app_data.rows_a, app_data.cols_a, sizeof(dbj_matrix_data_type)) / 1024.0f,
 		app_data.rows_b, app_data.cols_b, dbj_matrix_data_type_name, dbj_matrix_size_in_bytes(app_data.rows_b, app_data.cols_b, sizeof(dbj_matrix_data_type)) / 1024.0f,
@@ -358,6 +431,18 @@ DBJ_API void app_end(void)
 #if DBJ_BENCHMARKING
 
 // rezult reset and checking are done in UTEST's, see bellow
+
+UBENCH(matmul, matmul_transpose_sdot_faster) {
+	matmul_transpose_sdot_faster(
+		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
+		app_data.a, app_data.b, app_data.r);
+}
+
+UBENCH(matmul, matmul_transpose_sdot) {
+	matmul_transpose_sdot(
+		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
+		app_data.a, app_data.b, app_data.r);
+}
 
 UBENCH(matmul, matmul_mx_as_array_faster) {
 	matmul_mx_as_array_faster(
@@ -432,6 +517,23 @@ do {\
 #define reset_test_result() do { \
 for (unsigned k = 0; k < (DBJ_MX_R_COLS * DBJ_MX_R_ROWS); ++k) app_data.r[k] = (dbj_matrix_data_type)0; \
 } while (0)
+
+UTEST(matmul, matmul_transpose_sdot_faster) {
+	reset_test_result();
+	matmul_transpose_sdot_faster(
+		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
+		app_data.a, app_data.b, app_data.r);
+	check_test_result();
+}
+
+
+UTEST(matmul, matmul_transpose_sdot) {
+	reset_test_result();
+	matmul_transpose_sdot(
+		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
+		app_data.a, app_data.b, app_data.r);
+	check_test_result();
+}
 
 UTEST(matmul, matmul_mx_as_array_faster) {
 	reset_test_result();

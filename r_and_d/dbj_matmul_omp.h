@@ -2,14 +2,7 @@
 #define DBJ_MATMUL_OPEN_MP
 
 /*
-
-Inspiration: Source: https://github.com/ivanbgd/Matrix-Multiplication-MatMul-C
-The rest: (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj
-
-Matrices are represented as 1-D arrays in memory.
-That means they are contiguous in memory.
-Minimum dimension is 1, not 0, and internal dimensions must match.
-
+(c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj
 */
 
 #include <math.h>
