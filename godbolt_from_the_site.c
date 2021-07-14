@@ -1,5 +1,7 @@
 /*
 
+https://godbolt.org/z/4zWs9MhP7
+
  This is benchmarking of a collection of matrix multiplication algorithms.
  Algorithms are kept as simple as possible. No structs are passed as arguments.
  No "clever" "generic" matrix macros are used
@@ -19,19 +21,27 @@
 
  */
 
-#define DBJ_BENCHMARKING 1
+
+#define DBJ_BENCHMARKING 0
 #define DBJ_ON_GODBOLT 0
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wfloat-equal"
+  /* NDEBUG == RELEASE */
+#include <assert.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wlanguage-extension-token"
-#endif __clang__
+#ifdef _MSC_VER
+#pragma region common_trash
+#endif
+
+// #pragma GCC diagnostic push
+// #pragma GCC diagnostic ignored "-Wunknown-pragmas"
+// #pragma GCC diagnostic ignored "-Wunused-variable"
+// #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+// #pragma GCC diagnostic ignored "-Wunused-parameter"
+// #pragma GCC diagnostic ignored "-Wfloat-equal"
+
+// #ifdef __clang__
+// #pragma clang diagnostic ignored "-Wlanguage-extension-token"
+// #endif // __clang__
 
 #if ! DBJ_ON_GODBOLT
 #include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP 
@@ -42,24 +52,24 @@
 #endif  // ! DBJ_BENCHMARKING
 
 #else // on godbolt
+
 #   if DBJ_BENCHMARKING
 #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
 #else
 #   include "https://raw.githubusercontent.com/sheredom/utest.h/master/utest.h"
 #endif  // ! DBJ_BENCHMARKING
 #define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  
-#endif
 
-#pragma region common_trash
+#endif // DBJ_ON_GODBOLT
 
 #define DBJ_VT_RESET "\033[0m"
 #define DBJ_VT_GREEN "\033[32m"
 #define DBJ_VT_RED   "\033[31m"
 
 #if (defined(__clang__) || defined(__GNUC__))
-#define DBJ_CLANGNUC (1==1)
+#define DBJ_CLANGNUC 1
 #else
-#define DBJ_CLANGNUC (1==0)
+#define DBJ_CLANGNUC 0
 #endif
 
 #if DBJ_CLANGNUC
@@ -70,66 +80,13 @@
 #define DBJ_DTOR 
 #endif
 
- //#ifndef thread_local
- //# if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
- //#  define thread_local _Thread_local
- //# elif defined _WIN32 && ( \
- //	   defined _MSC_VER || \
- //	   defined __ICL || \
- //	   defined __DMC__ || \
- //	   defined __BORLANDC__ )
- //#  define thread_local __declspec(thread) 
- // /* note that ICC (linux) and Clang are covered by __GNUC__ */
- //# elif defined __GNUC__ || \
- //	   defined __SUNPRO_C || \
- //	   defined __xlC__
- //#  define thread_local __thread
- //# else
- //#  error "Cannot define thread_local"
- //# endif
- //#endif
-
-  //#ifdef __STDC_NO_ATOMICS__
-  //#error Please use C11 or better with ATOMICS
-  //#else
-  //#include <stdatomic.h>
-  //#endif
-
-#define DBJ_SWAP(x,y) do {\
-typeof(x) T_ = x;      \
-x = y;                 \
-y = T_;                \
- } while (0)
-
- /* NDEBUG == RELEASE */
-#include <assert.h>
-/////////////////////////////////////////////////////////////////////////
-
-#undef NOMEM_POLICY
-
-#ifdef NDEBUG 
-#define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
-#else // ! NDEBUG == DEBUG
-#define NOMEM_POLICY( BOOLEXP_ ) if (! BOOLEXP_ ) { perror( __FILE__ ", Could not allocate memory!"); exit(-1); }
-#endif // ! NDEBUG
-
-// for when we are sure ARR is the array
-#define DBJ_CNT(ARR) ( sizeof(ARR) / sizeof(ARR[0]) )
-
-#undef MALLOC_WITH_POLICY
-#define MALLOC_WITH_POLICY(PTR_ , SIZE_)  do { PTR_ = malloc( SIZE_); NOMEM_POLICY(PTR_); } while(0)
-
-#undef CALLOC_WITH_POLICY
-#define CALLOC_WITH_POLICY(PTR_ ,R_,C_, SIZE_)  do { PTR_ = calloc(R_ * C_, SIZE_); NOMEM_POLICY(PTR_); } while(0)
-
-#define DBJ_FREE(P_) do { if (P_){ free(P_); P_ = NULL; }  }while(0)
-
 #undef DBJ_API
 #define DBJ_API static
 
+#ifdef _MSC_VER
 #pragma endregion // common_trash
-
 #pragma region common data 
+#endif
 /////////////////////////////////////////////////////////////////////////
 // dimensions
 #if DBJ_BENCHMARKING
@@ -175,9 +132,12 @@ typedef dbj_matrix_data_type(*dbj_mx_a_row)[DBJ_MX_A_COLS];
 typedef dbj_matrix_data_type(*dbj_mx_b_row)[DBJ_MX_B_COLS];
 typedef dbj_matrix_data_type(*dbj_mx_r_row)[DBJ_MX_R_COLS];
 
+#ifdef _MSC_VER
 #pragma endregion // common data 
-
 #pragma region matrix functions and various matmuls
+#endif
+
+#if DBJ_BENCHMARKING
 
 DBJ_API void* matrix_arr_init
 (const unsigned rows_a, const unsigned cols_a, dbj_matrix_data_type a[static rows_a][cols_a]) {
@@ -188,6 +148,7 @@ DBJ_API void* matrix_arr_init
 	}
 	return a;
 }
+#endif // DBJ_BENCHMARKING
 
 #define dbj_matrix_size_in_bytes( rows_, cols_, type_ ) ( rows_ * cols_ * sizeof(type_) )
 
@@ -296,7 +257,7 @@ DBJ_API dbj_matrix_data_type* matmul_mx_as_array_another
 	// VLA may not be initialized
 	dbj_matrix_data_type bt[a_rows * b_cols]; // = { (dbj_matrix_data_type)0 };
 
-	dbj_matrix_transpose(a_rows, b_cols, b, bt);
+	dbj_matrix_transpose(a_rows, b_cols, (void*)b, (void*)bt);
 
 	for (unsigned i = 0; i < a_rows; i++) {
 		for (unsigned k = 0; k < b_cols; k++) {
@@ -313,17 +274,17 @@ DBJ_API dbj_matrix_data_type* matmul_mx_as_array_another
 // this is VMT based
 DBJ_API void* matmul_transpose_sdot(
 	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
-	const dbj_matrix_data_type a[static n_a_rows][n_a_cols],
-	const dbj_matrix_data_type b[static n_a_rows][n_b_cols],
+	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
+	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
 	dbj_matrix_data_type m[static n_a_rows][n_b_cols]
 )
 {
-	int  n_b_rows = n_a_cols;
+	// n_b_rows == n_a_cols;
 
 	// variable-sized object may not be initialized
 	dbj_matrix_data_type bt[n_a_rows][n_b_cols];
 
-	dbj_matrix_transpose(n_a_rows, n_b_cols, b, bt);
+	dbj_matrix_transpose(n_a_rows, n_b_cols, (void*)b, (void*)bt);
 
 	for (unsigned i = 0; i < n_a_rows; ++i)
 		for (unsigned j = 0; j < n_b_cols; ++j)
@@ -338,11 +299,11 @@ DBJ_API void* matmul_transpose_sdot_faster(
 	dbj_matrix_data_type m[static n_a_rows][n_b_cols]
 )
 {
-	int n_b_rows = n_a_cols;
+	// n_b_rows == n_a_cols;
 
 	// variable-sized object may not be initialized
 	dbj_matrix_data_type bT[n_a_rows][n_b_cols];
-	dbj_matrix_transpose(n_a_rows, n_b_cols, b, bT);
+	dbj_matrix_transpose(n_a_rows, n_b_cols, (void*)b, (void*)bT);
 
 	for (unsigned i = 0; i < n_a_rows; ++i)
 		for (unsigned j = 0; j < n_b_cols; ++j)
@@ -351,14 +312,17 @@ DBJ_API void* matmul_transpose_sdot_faster(
 }
 
 
+#ifdef _MSC_VER
 #pragma endregion // matrix functions and various matmuls
+#endif
 
+#ifdef _MSC_VER
 #pragma region common for testing or benchmarking
+#endif
 
 // ubench functions have no parameters
 // thus we use common data aka globals
 typedef struct {
-
 	const unsigned rows_a;
 	const unsigned cols_a;
 	const unsigned rows_b;
@@ -373,23 +337,23 @@ typedef struct {
 } app_data_type;
 
 #define reset_test_result() do { \
-dbj_matrix_data_type (*rap)[DBJ_MX_R_ROWS * DBJ_MX_R_COLS] = app_data.r ; \
+dbj_matrix_data_type (*rap)[DBJ_MX_R_ROWS * DBJ_MX_R_COLS] = (void*)app_data.r ; \
 memset( rap, 0, sizeof(dbj_matrix_data_type[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]));    \
 } while (0)
 
 DBJ_API app_data_type app_data = {
-			.rows_a = DBJ_MX_A_ROWS,
-				.cols_a = DBJ_MX_A_COLS,
-				.rows_b = DBJ_MX_B_ROWS,
-				.cols_b = DBJ_MX_B_COLS,
-				.rows_r = DBJ_MX_A_ROWS, /* the result */
-				.cols_r = DBJ_MX_B_COLS,
-				// the rest is auto zeroed 
+    .rows_a = DBJ_MX_A_ROWS,
+    .cols_a = DBJ_MX_A_COLS,
+    .rows_b = DBJ_MX_B_ROWS,
+    .cols_b = DBJ_MX_B_COLS,
+    .rows_r = DBJ_MX_A_ROWS, /* the result */
+    .cols_r = DBJ_MX_B_COLS,
+    // the rest is auto zeroed 
 #if !DBJ_BENCHMARKING
 // testing data 
-			{ {1,2},{3,4} },
-			{ {5,6},{7,8} },
-			{ {0,0},{0,0} }
+    { {1,2},{3,4} },
+    { {5,6},{7,8} },
+    { {0,0},{0,0} }
 #endif // !DBJ_BENCHMARKING
 };
 
@@ -424,12 +388,12 @@ DBJ_API void app_start(void)
 	const float size_b = dbj_matrix_size_in_bytes(app_data.rows_b, app_data.cols_b, dbj_matrix_data_type) / 1024.0f;
 	const float size_r = dbj_matrix_size_in_bytes(app_data.rows_r, app_data.cols_r, dbj_matrix_data_type) / 1024.0f;
 
-	fprintf(stderr, "\n\n" DBJ_VT_RED DBJ_APP_KIND DBJ_VT_RESET " various matrix multiplication algorithms"
+	fprintf(stderr, "\n\n" DBJ_VT_RED DBJ_APP_KIND " " DBJ_VT_RESET " various matrix multiplication algorithms"
 		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj \nTimestamp: %s"
 		"\n\nMatrices are\n"
 		"\nA :%4d * %4d * sizeof(%s) == %4.2f KB"
 		"\nB :%4d * %4d * sizeof(%s) == %4.2f KB"
-		"\nR :%4d * %4d * sizeof(%s) == %4.2f KB\n\n"
+		"\nR :%4d * %4d * sizeof(%s) == %4.2f KB\n\n" DBJ_VT_RESET
 		, DBJ_BUILD_TIMESTAMP,
 		app_data.rows_a, app_data.cols_a, dbj_matrix_data_type_name, size_a,
 		app_data.rows_b, app_data.cols_b, dbj_matrix_data_type_name, size_b,
@@ -571,9 +535,11 @@ UTEST(matmul, the_most_by_the_book_matrix_mult) {
 	check_test_result();
 }
 
-#endif // ! DBJ_BENCHMARKING
+#endif // ! DBJ_BENCHMARKING means tsting
 
+#ifdef _MSC_VER
 #pragma region common main
+#endif
 
 #if  DBJ_BENCHMARKING
 UBENCH_STATE();
@@ -596,8 +562,12 @@ return utest_main(argc, argv);
 	
 	app_end();
 }
+#ifdef _MSC_VER
 #pragma endregion // common main
+#endif
 
+#ifdef _MSC_VER
 #pragma endregion // common for testing or benchmarking
+#endif
 
-#pragma GCC diagnostic pop
+// #pragma GCC diagnostic pop

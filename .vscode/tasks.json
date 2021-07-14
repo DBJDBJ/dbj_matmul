@@ -9,8 +9,8 @@
 				/* "-s",
 				"-O3", */
 				 "-g", 
-				/* "-Wall", 
-				/* "-pedantic", */
+				"-Wall", 
+				"-pedantic",
 				"${file}",
 				"-o",
 				"${fileDirname}\\${fileBasenameNoExtension}.exe"
