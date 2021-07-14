@@ -21,6 +21,7 @@ https://godbolt.org/z/4zWs9MhP7
 
  */
 
+#define __STDC_WANT_LIB_EXT1__ 1 
 
 #define DBJ_BENCHMARKING 1
 #define DBJ_ON_GODBOLT 0
@@ -29,7 +30,7 @@ https://godbolt.org/z/4zWs9MhP7
 #include <assert.h>
 
 #ifdef _MSC_VER
-#pragma region common_trash
+#pragma region common trash
 #endif
 
 // #pragma GCC diagnostic push
@@ -80,19 +81,39 @@ https://godbolt.org/z/4zWs9MhP7
 #define DBJ_DTOR 
 #endif
 
+#undef NOMEM_POLICY
+
+#ifdef NDEBUG 
+#define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
+#else // ! NDEBUG == DEBUG
+#define NOMEM_POLICY( BOOLEXP_ ) if (! BOOLEXP_ ) { perror( __FILE__ ", Could not allocate memory!"); exit(-1); }
+#endif // ! NDEBUG
+
+// for when we are sure ARR is the array
+#define DBJ_CNT(ARR) ( sizeof(ARR) / sizeof(ARR[0]) )
+
+#undef MALLOC_WITH_POLICY
+#define MALLOC_WITH_POLICY(PTR_ , SIZE_)  do { PTR_ = malloc( SIZE_); NOMEM_POLICY(PTR_); } while(0)
+
+#undef CALLOC_WITH_POLICY
+#define CALLOC_WITH_POLICY(PTR_ ,R_,C_, SIZE_)  do { PTR_ = calloc(R_ * C_, SIZE_); NOMEM_POLICY(PTR_); } while(0)
+
+#define DBJ_FREE(P_) do { if (P_){ free(P_); P_ = NULL; }  }while(0)
+
 #undef DBJ_API
 #define DBJ_API static
 
 #ifdef _MSC_VER
-#pragma endregion // common_trash
+#pragma endregion // commo trash
 #pragma region common data 
 #endif
 /////////////////////////////////////////////////////////////////////////
 // dimensions
 #if DBJ_BENCHMARKING
 
-// NOTE: here we use stack based matrices , thus be carefull with sizes
+// NOTE: here we use stack based prottype design , thus be carefull with sizes
 //       UBENCH repeats execution so matrix size is not the prevailing factor
+//       keep them small-ish
 #define DBJ_MX_A_ROWS 0xFF
 #define DBJ_MX_A_COLS 0xFF * 2
 #define DBJ_MX_B_ROWS DBJ_MX_A_COLS
@@ -100,6 +121,9 @@ https://godbolt.org/z/4zWs9MhP7
 
 #else // testing
 	/*
+         In case of testing we use this constelation
+         of matrices, to check the correctness of algorithms
+
 	 *     ! 1 2 |      | 5 6 |       | 19 22 |
 	 *     |     |  x   |     |  =    |       |
 	 *     | 3 4 |      | 7 8 |       | 43 50 |
@@ -150,7 +174,7 @@ DBJ_API void* matrix_arr_init
 }
 #endif // DBJ_BENCHMARKING
 
-#define dbj_matrix_size_in_bytes( rows_, cols_, type_ ) ( rows_ * cols_ * sizeof(type_) )
+#define dbj_matrix_size_bytes( rows_, cols_, type_ ) ( rows_ * cols_ * sizeof(type_) )
 
 DBJ_API void dbj_matrix_transpose(
 	const unsigned rows_m,
@@ -251,60 +275,73 @@ DBJ_API dbj_matrix_data_type* matmul_mx_as_array
 /* ---------------------------------------------------------------------------- */
 DBJ_API dbj_matrix_data_type* matmul_mx_as_array_another
 (const size_t a_rows, const size_t a_cols, const size_t b_cols,
-	dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c
+	dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c, dbj_matrix_data_type* bT
 )
 {
-	// VLA may not be initialized
-	dbj_matrix_data_type * bt = calloc( a_rows * b_cols, sizeof(dbj_matrix_data_type) ); 
-
-	dbj_matrix_transpose(a_rows, b_cols, (void*)b, (void*)bt);
+  // orinteering
+    // const unsigned b_rows  = a_cols;
+    // const unsigned bt_rows = b_cols;
+    // const unsigned bt_cols = b_rows ;
+	
+	dbj_matrix_data_type * bTR = bT; 
+	dbj_matrix_transpose( a_cols , b_cols, (void*)b, (void*)bTR);
 
 	for (unsigned i = 0; i < a_rows; i++) {
 		for (unsigned k = 0; k < b_cols; k++) {
 			dbj_matrix_data_type sum = 0.0;
 			for (unsigned j = 0; j < a_cols; j++) {
-				sum += a[i * a_cols + j] * bt[k * b_cols + j];
+				sum += a[i * a_cols + j] * bTR[k * b_cols + j];
 			}
 			c[i * b_cols + k] = sum;
 		}
 	}
-    free(bt);
 	return c;
 }
 
 // this is VMT based
 DBJ_API void* matmul_transpose_sdot(
-	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
-	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
-	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
-	dbj_matrix_data_type m[static n_a_rows][n_b_cols]
+	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
+	dbj_matrix_data_type a[static a_rows][ a_cols],
+	dbj_matrix_data_type b[static a_cols][ b_cols],
+	dbj_matrix_data_type m[static a_rows][ b_cols] ,
+    // allocated space for transposed b
+	dbj_matrix_data_type bT[static b_cols][a_cols]    
 )
-{
-	dbj_matrix_data_type (* bt)[n_b_cols] = malloc( sizeof(dbj_matrix_data_type[n_b_cols][n_a_rows]) ); 
+{   // orinteering
+    // const unsigned b_rows  = a_cols;
+    // const unsigned bt_rows = b_cols;
+    // const unsigned bt_cols = b_rows ;
+	
+    dbj_matrix_data_type (* bTR)[a_cols]  = bT; 
+	dbj_matrix_transpose( a_cols , b_cols, (void*)b, (void*)bTR);
 
-	dbj_matrix_transpose(n_a_rows, n_b_cols, (void*)b, (void*)bt);
+	for (unsigned i = 0; i < a_rows; ++i)
+		for (unsigned j = 0; j < b_cols; ++j)
+			m[i][j] = sdot_8( a_cols, a[i], bTR[j]);
 
-	for (unsigned i = 0; i < n_a_rows; ++i)
-		for (unsigned j = 0; j < n_b_cols; ++j)
-			m[i][j] = sdot_8(n_a_cols, a[i], bt[j]);
-    free(bt) ;
 	return m;
 }
 
 DBJ_API void* matmul_transpose_sdot_another(
-	const unsigned n_a_rows, const unsigned n_a_cols, const unsigned n_b_cols,
-	dbj_matrix_data_type a[static n_a_rows][n_a_cols],
-	dbj_matrix_data_type b[static n_a_rows][n_b_cols],
-	dbj_matrix_data_type m[static n_a_rows][n_b_cols]
+	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
+	dbj_matrix_data_type a[static a_rows][ a_cols],
+	dbj_matrix_data_type b[static a_cols][ b_cols],
+	dbj_matrix_data_type m[static a_rows][ b_cols],
+    // allocated space for transposed b
+	dbj_matrix_data_type bT[static b_cols][a_cols]
 )
-{
-	dbj_matrix_data_type (* bT)[n_b_cols] = malloc( sizeof(dbj_matrix_data_type[n_b_cols][n_a_rows]) ); 
-	dbj_matrix_transpose(n_a_rows, n_b_cols, (void*)b, (void*)bT);
+{   // orienteering
+    // const unsigned b_rows  = a_cols;
+    // const unsigned bt_rows = b_cols;
+    // const unsigned bt_cols = b_rows ;
 
-	for (unsigned i = 0; i < n_a_rows; ++i)
-		for (unsigned j = 0; j < n_b_cols; ++j)
-			m[i][j] = sdot_1(n_a_cols, a[i], bT[j]);
-    free(bT) ;            
+    // pointer to bT Row 
+	dbj_matrix_data_type (* bTR)[a_cols] = bT ; 
+	dbj_matrix_transpose( a_cols, b_cols, (void*)b, (void*)bTR);
+
+	for (unsigned i = 0; i < a_rows; ++i)
+		for (unsigned j = 0; j < b_cols; ++j)
+			m[i][j] = sdot_1( a_cols, a[i], bTR[j]);
 	return m;
 }
 
@@ -323,9 +360,15 @@ typedef struct {
 	const unsigned cols_b;
 	const unsigned rows_r;
 	const unsigned cols_r;
+    // transposed B dimension
+	const unsigned rows_bT;
+	const unsigned cols_bT;
 	// the matrixes
 	dbj_matrix_data_type a[DBJ_MX_A_ROWS][DBJ_MX_A_COLS];
 	dbj_matrix_data_type b[DBJ_MX_B_ROWS][DBJ_MX_B_COLS];
+    // transposed b 
+	dbj_matrix_data_type bT[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
+    // the result
 	dbj_matrix_data_type r[DBJ_MX_R_ROWS][DBJ_MX_R_COLS]; /* rezult size is a rows * b cols */
 
 } app_data_type;
@@ -340,14 +383,20 @@ DBJ_API app_data_type app_data_prototype = {
     .cols_a = DBJ_MX_A_COLS,
     .rows_b = DBJ_MX_B_ROWS,
     .cols_b = DBJ_MX_B_COLS,
-    .rows_r = DBJ_MX_A_ROWS, /* the result */
+    // transpode b dimension
+    .rows_bT  = DBJ_MX_B_COLS,
+    .cols_bT  = DBJ_MX_B_ROWS ,
+    /* the result */
+    .rows_r = DBJ_MX_A_ROWS, 
     .cols_r = DBJ_MX_B_COLS,
-    // the rest is auto zeroed 
+// the rest is auto zeroed matrics but still
+// for BENCHMARKIG this also creates potentially huge thing on the stack
 #if !DBJ_BENCHMARKING
 // unless we are testing 
-    { {1,2},{3,4} },
-    { {5,6},{7,8} },
-    { {0,0},{0,0} }
+    .a = { {1,2},{3,4} }, 
+    .b = { {5,6},{7,8} }, 
+    .bT = { {0,0},{0,0} }, 
+    .r = { {0,0},{0,0} }  
 #endif // !DBJ_BENCHMARKING
 };
 
@@ -362,10 +411,12 @@ DBJ_API void app_start(void)
         exit( EXIT_FAILURE );
     }
 
-    errno_t rez = memcpy_s( app_data, sizeof(*app_data) ,  &app_data_prototype, sizeof app_data_prototype );
+    static_assert( sizeof(*app_data) == sizeof app_data_prototype , "Wut?!") ;
 
-    if ( rez ) {
-        perror(__FILE__ ", memcpy_s() failed" );
+    void * rez = memcpy( app_data, &app_data_prototype, sizeof app_data_prototype );
+
+    if ( ! rez ) {
+        perror(__FILE__ ", memcpy() failed" );
         exit( EXIT_FAILURE );
     }
 
@@ -377,7 +428,9 @@ DBJ_API void app_start(void)
 
 	matrix_arr_init(app_data->rows_a, app_data->cols_a, app_data->a);
 	matrix_arr_init(app_data->rows_b, app_data->cols_b, app_data->b);
-	matrix_arr_init(app_data->rows_r, app_data->cols_r, app_data->r);
+    // r and bT are zeroed when app_data_prototype was made now we allocat them matrices
+    // CALLOC_WITH_POLICY(app_data->bT, app_data->rows_bT, app_data->cols_bT, sizeof(dbj_matrix_data_type));
+    // CALLOC_WITH_POLICY(app_data->r, app_data->rows_r, app_data->cols_r, sizeof(dbj_matrix_data_type));
 
 #else // TESTING 
 
@@ -394,9 +447,9 @@ DBJ_API void app_start(void)
 
 #endif // ! DBJ_BENCHMARKING
 
-	const float size_a = dbj_matrix_size_in_bytes(app_data->rows_a, app_data->cols_a, dbj_matrix_data_type) / 1024.0f;
-	const float size_b = dbj_matrix_size_in_bytes(app_data->rows_b, app_data->cols_b, dbj_matrix_data_type) / 1024.0f;
-	const float size_r = dbj_matrix_size_in_bytes(app_data->rows_r, app_data->cols_r, dbj_matrix_data_type) / 1024.0f;
+	const float size_a = dbj_matrix_size_bytes(app_data->rows_a, app_data->cols_a, dbj_matrix_data_type) / 1024.0f;
+	const float size_b = dbj_matrix_size_bytes(app_data->rows_b, app_data->cols_b, dbj_matrix_data_type) / 1024.0f;
+	const float size_r = dbj_matrix_size_bytes(app_data->rows_r, app_data->cols_r, dbj_matrix_data_type) / 1024.0f;
 
 	fprintf(stderr, "\n\n" DBJ_VT_RED DBJ_APP_KIND " " DBJ_VT_RESET " various matrix multiplication algorithms"
 		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj \nTimestamp: %s"
@@ -414,6 +467,12 @@ DBJ_API void app_start(void)
 
 DBJ_API void app_end(void)
 {
+    // DBJ_FREE( app_data->a  ) ;
+    // DBJ_FREE( app_data->b  ) ;
+    // DBJ_FREE( app_data->bT ) ;
+    // DBJ_FREE( app_data->r  ) ;
+    DBJ_FREE( app_data     ) ;
+
 	printf(" " DBJ_VT_RESET " ");
 
 }
@@ -426,13 +485,13 @@ DBJ_API void app_end(void)
 UBENCH(matmul, matmul_transpose_sdot_another) {
 	matmul_transpose_sdot_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		app_data->a, app_data->b, app_data->r);
+		app_data->a, app_data->b, app_data->r, app_data->bT );
 }
 
 UBENCH(matmul, matmul_transpose_sdot) {
 	matmul_transpose_sdot(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		app_data->a, app_data->b, app_data->r);
+		app_data->a, app_data->b, app_data->r, app_data->bT );
 }
 
 UBENCH(matmul, matmul_mx_as_array_another) {
@@ -440,7 +499,8 @@ UBENCH(matmul, matmul_mx_as_array_another) {
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		(void*)app_data->a,
 		(void*)app_data->b,
-		(void*)app_data->r
+		(void*)app_data->r,
+		(void*)app_data->bT
 	);
 }
 
@@ -497,7 +557,7 @@ UTEST(matmul, matmul_transpose_sdot_another) {
 	reset_test_result();
 	matmul_transpose_sdot_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		app_data->a, app_data->b, app_data->r);
+		app_data->a, app_data->b, app_data->r, app_data->bT);
 	check_test_result();
 }
 
@@ -506,7 +566,7 @@ UTEST(matmul, matmul_transpose_sdot) {
 	reset_test_result();
 	matmul_transpose_sdot(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		app_data->a, app_data->b, app_data->r);
+		app_data->a, app_data->b, app_data->r, app_data->bT);
 	check_test_result();
 }
 
@@ -516,7 +576,8 @@ UTEST(matmul, matmul_mx_as_array_another) {
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		(void*)app_data->a,
 		(void*)app_data->b,
-		(void*)app_data->r
+		(void*)app_data->r,
+		(void*)app_data->bT
 	);
 	check_test_result();
 }
