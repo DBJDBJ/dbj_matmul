@@ -23,15 +23,18 @@ https://godbolt.org/z/4zWs9MhP7
 
 #define __STDC_WANT_LIB_EXT1__ 1 
 
-#define DBJ_BENCHMARKING 1
+#define DBJ_BENCHMARKING 0
 #define DBJ_ON_GODBOLT 0
 
- /* NDEBUG == RELEASE */
-#include <assert.h>
+#define winograd_api_implementation 1
+#include "dbj_winograd.h" 
 
 #ifdef _MSC_VER
 #pragma region common trash
 #endif
+
+ /* NDEBUG == RELEASE */
+#include <assert.h>
 
 #if (defined(__clang__) || defined(__GNUC__))
 #define DBJ_CLANGNUC 1
@@ -85,8 +88,6 @@ https://godbolt.org/z/4zWs9MhP7
 #define DBJ_DTOR 
 #endif
 
-#undef NOMEM_POLICY
-
 #ifdef NDEBUG 
 #define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
 #else // ! NDEBUG == DEBUG
@@ -108,7 +109,7 @@ https://godbolt.org/z/4zWs9MhP7
 #define DBJ_API static
 
 #ifdef _MSC_VER
-#pragma endregion // commo trash
+#pragma endregion // common trash
 #pragma region common data 
 #endif
 /////////////////////////////////////////////////////////////////////////
@@ -150,7 +151,8 @@ typedef double dbj_matrix_data_type;
 #define dbj_matrix_data_type_name "double"
 
 // NOTE: these are compile time typedefs 
-// we can create them if we do not use Variably Modified Types (VMT)
+// we can create them here
+// if we do not use Variably Modified Types (VMT)
 
 typedef dbj_matrix_data_type(*dbj_mx_a_pointer)[DBJ_MX_A_COLS][DBJ_MX_A_ROWS];
 typedef dbj_matrix_data_type(*dbj_mx_b_pointer)[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
@@ -357,7 +359,7 @@ DBJ_API void* matmul_transpose_sdot_another(
 
 // ubench functions have no parameters
 // thus we use common data aka globals
-typedef struct {
+typedef struct app_data_struct {
 	const unsigned rows_a;
 	const unsigned cols_a;
 	const unsigned rows_b;
@@ -375,6 +377,15 @@ typedef struct {
 	// the result
 	dbj_matrix_data_type r[DBJ_MX_R_ROWS][DBJ_MX_R_COLS]; /* rezult size is a rows * b cols */
 
+	// winograd matmul required pre-proc step
+	// we shall do it once for them app_start() function
+	struct winograd_struct {
+		const unsigned row_size;
+		const unsigned col_size;
+		dbj_matrix_data_type row[DBJ_MX_A_ROWS];
+		dbj_matrix_data_type col[DBJ_MX_B_COLS];
+	} winograd;
+
 } app_data_type;
 
 #define reset_test_result() do { \
@@ -382,35 +393,41 @@ dbj_matrix_data_type (*rap)[DBJ_MX_R_ROWS * DBJ_MX_R_COLS] = (void*)app_data->r 
 memset( rap, 0, sizeof(dbj_matrix_data_type[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]));    \
 } while (0)
 
-// CAUTION : if you declar large dimension this will take a 
-// lot of stack space. Or just fail.
-DBJ_API app_data_type app_data_prototype = {
-	.rows_a = DBJ_MX_A_ROWS,
-	.cols_a = DBJ_MX_A_COLS,
-	.rows_b = DBJ_MX_B_ROWS,
-	.cols_b = DBJ_MX_B_COLS,
-	// transposed b dimension
-	.rows_bT = DBJ_MX_B_COLS,
-	.cols_bT = DBJ_MX_B_ROWS ,
-	/* the result */
-	.rows_r = DBJ_MX_A_ROWS,
-	.cols_r = DBJ_MX_B_COLS,
-	// the rest is auto zeroed matrices but still
-	// for BENCHMARKIG large dimensions
-	// this also creates potentially huge thing on the stack
-	#if !DBJ_BENCHMARKING
-	// unless we are testing 
-		.a = { {1,2},{3,4} },
-		.b = { {5,6},{7,8} },
-		.bT = { {0,0},{0,0} },
-		.r = { {0,0},{0,0} }
-	#endif // !DBJ_BENCHMARKING
-};
+
 
 DBJ_API app_data_type* app_data = 0;
 
 DBJ_API void app_start(void)
 {
+	// CAUTION : if you declare large dimensions this will take a 
+// lot of stack space. Or just fail.
+	DBJ_API app_data_type app_data_prototype = {
+		.rows_a = DBJ_MX_A_ROWS,
+		.cols_a = DBJ_MX_A_COLS,
+		.rows_b = DBJ_MX_B_ROWS,
+		.cols_b = DBJ_MX_B_COLS,
+		// transposed b dimension
+		.rows_bT = DBJ_MX_B_COLS,
+		.cols_bT = DBJ_MX_B_ROWS ,
+		/* the result */
+		.rows_r = DBJ_MX_A_ROWS,
+		.cols_r = DBJ_MX_B_COLS,
+
+		#if !DBJ_BENCHMARKING
+		// unless we are testing 
+			.a = { {1,2},{3,4} },
+			.b = { {5,6},{7,8} },
+			.bT = { {0,0},{0,0} },
+			.r = { {0,0},{0,0} } ,
+		#endif // !DBJ_BENCHMARKING
+
+		.winograd =
+		{
+			.row_size = DBJ_MX_A_ROWS,
+			.col_size = DBJ_MX_B_COLS
+		}
+	};
+
 	app_data = calloc(1, sizeof(app_data_type));
 
 	if (!app_data) {
@@ -426,6 +443,14 @@ DBJ_API void app_start(void)
 		perror(__FILE__ ", memcpy() failed");
 		exit(EXIT_FAILURE);
 	}
+
+	// here we will do the winograd pre-proc step ONCE
+	// and keep the result
+	winograd_preprocess(
+		app_data->rows_a, app_data->cols_a, app_data->a,
+		app_data->rows_b, app_data->cols_b, app_data->b,
+		app_data->winograd.row_size, app_data->winograd.row,
+		app_data->winograd.col_size, app_data->winograd.col);
 
 #undef DBJ_APP_KIND
 
@@ -475,10 +500,6 @@ DBJ_API void app_start(void)
 
 DBJ_API void app_end(void)
 {
-	// DBJ_FREE( app_data->a  ) ;
-	// DBJ_FREE( app_data->b  ) ;
-	// DBJ_FREE( app_data->bT ) ;
-	// DBJ_FREE( app_data->r  ) ;
 	DBJ_FREE(app_data);
 
 	printf(" " DBJ_VT_RESET " ");
@@ -489,6 +510,15 @@ DBJ_API void app_end(void)
 #if DBJ_BENCHMARKING
 
 // rezult reset and checking are done in UTEST's, see bellow
+
+UBENCH(matmul, winograd) {
+	winograd_mult(
+		app_data->rows_a, app_data->cols_a, (void*)app_data->a,
+		app_data->rows_b, app_data->cols_b, (void*)app_data->b,
+		app_data->rows_r, app_data->cols_r, (void*)app_data->r,
+		app_data->winograd.row_size, app_data->winograd.row,
+		app_data->winograd.col_size, app_data->winograd.col);
+}
 
 UBENCH(matmul, matmul_transpose_sdot_another) {
 	matmul_transpose_sdot_another(
@@ -560,6 +590,16 @@ do {\
 	EXPECT_EQ(app_data->r[1][1] , (dbj_matrix_data_type)50);\
 } while(0)
 
+UTEST(matmul, winograd) {
+	reset_test_result();
+	winograd_mult(
+		app_data->rows_a, app_data->cols_a, (void*)app_data->a,
+		app_data->rows_b, app_data->cols_b, (void*)app_data->b,
+		app_data->rows_r, app_data->cols_r, (void*)app_data->r,
+		app_data->winograd.row_size, app_data->winograd.row,
+		app_data->winograd.col_size, app_data->winograd.col);
+	check_test_result();
+}
 
 UTEST(matmul, matmul_transpose_sdot_another) {
 	reset_test_result();
@@ -568,7 +608,6 @@ UTEST(matmul, matmul_transpose_sdot_another) {
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 	check_test_result();
 }
-
 
 UTEST(matmul, matmul_transpose_sdot) {
 	reset_test_result();
