@@ -62,7 +62,7 @@ winograd_api void winograd_preprocess(
 		row[i] = 0;
 		for (int j = 0; j < d; j++)
 		{
-			row[i] += m1[i][2 * j] * m1[i][2 * j + 1];
+			row[i] += (m1[i][2 * j] * m1[i][2 * j + 1]);
 		}
 	}
 
@@ -71,7 +71,7 @@ winograd_api void winograd_preprocess(
 		col[i] = 0;
 		for (int j = 0; j < d; j++)
 		{
-			col[i] += m2[2 * j][i] * m2[2 * j + 1][i];
+			col[i] += (m2[2 * j][i] * m2[2 * j + 1][i]);
 		}
 	}
 }
@@ -110,5 +110,18 @@ winograd_api void winograd_mult(
 }
 
 #endif // winograd_api_implementation
+
+#if dbj_winograd_h_testing 
+UTEST(matmul, winograd) {
+	reset_test_result();
+	winograd_mult(
+		app_data->rows_a, app_data->cols_a, (void*)app_data->a,
+		app_data->rows_b, app_data->cols_b, (void*)app_data->b,
+		app_data->rows_r, app_data->cols_r, (void*)app_data->r,
+		app_data->winograd.row_size, app_data->winograd.row,
+		app_data->winograd.col_size, app_data->winograd.col);
+	check_test_result();
+}
+#endif // dbj_winograd_h_testing 
 
 #endif // dbj_winograd_h

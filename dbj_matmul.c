@@ -6,28 +6,73 @@ https://godbolt.org/z/4zWs9MhP7
  Algorithms are kept as simple as possible. No structs are passed as arguments.
  No "clever" "generic" matrix macros are used
 
- Different comoilers multiplied with different platforms multiplied selection
+ Different compilers multiplied with different platforms multiplied with selection
  of data types  yield a complex picture of benchmarking results.
 
  Although here is strong hint for you: The simplest algorithm is the fastest.
  Keep in mind compiler has the easiest job optimizing the simplest code.
 
+For smaller matrices it is almost irrelevant which algorithm is used
+what is "smaller" depends on the runtime. 
+Generally up to 1024 x 1024 the best algorithm from here would suffice
+above that use BLAS or LAPAC or one of the many variants of them two.
+GPU's have matmuls "on board" so that is another option; for that see CUDA
+
  Use this file to recompile and re measure whenever selecting
- the right matrix multiplication algorithm
+ the right matrix multiplication algorithm for a new platform 
 
  https://godbolt.org/z/1KTE3PnEP
 
  (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj/
 
- */
 
-#define __STDC_WANT_LIB_EXT1__ 1 
+Matrix multiplication required dimensions relationship
 
-#define DBJ_BENCHMARKING 0
+A(3,2) x B(2,3) = R(3,3)
+                              +------+------+------+
+                              |      |      |      |
+                              |      |      |      |
+                              |      |      |      |
+                         B    +--------------------+  2 rows
+                              |      |      |      |
+                              |      |      |      |
+                              |      |      |      |
+                              +------+------+------+
+
+            2 columns              3 columns
+
+        +------+------+       +------+------+------+
+        |      |      |       |      |      |      |
+3 rows  |      |      |       |      |      |      |  
+        |      |      |       |      |      |      |
+        +-------------+       +--------------------+
+        |      |      |       |      |      |      |
+A       |      |      |   R   |      |      |      |  3 rows
+        |      |      |       |      |      |      |
+        +-------------+       +--------------------+
+        |      |      |       |      |      |      |
+        |      |      |       |      |      |      |
+        |      |      |       |      |      |      |
+        +------+------+       +------+------+------+
+*/
+
+// larger side is  * 2
+// ignored for testing, for testing see the data used bellow
+#define DBJ_MX_SMALLER_SIDE 128
+
+// A * B = R 
+// few algortihms are using transposed B
+// if A and B are not changed between the calls 
+// another optimisation is to "pre transpose" once
+// Ditto
+#define DBJ_MX_ALREADY_TRANSPOSED 1
+
+// for testing make it 0
+#define DBJ_BENCHMARKING 1
+// when on godbolt make it 1
+// godbolt times out for even small sizes
+// is is used just to confirm code compiles with no warnings
 #define DBJ_ON_GODBOLT 0
-
-#define winograd_api_implementation 1
-#include "dbj_winograd.h" 
 
 #ifdef _MSC_VER
 #pragma region common trash
@@ -41,21 +86,6 @@ https://godbolt.org/z/4zWs9MhP7
 #else
 #define DBJ_CLANGNUC 0
 #endif
-
-#if DBJ_CLANGNUC
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wfloat-equal"
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wlanguage-extension-token"
-#endif // __clang__
-
-#endif // DBJ_CLANGNUC
 
 #if ! DBJ_ON_GODBOLT
 #include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP 
@@ -80,6 +110,7 @@ https://godbolt.org/z/4zWs9MhP7
 #define DBJ_VT_GREEN "\033[32m"
 #define DBJ_VT_RED   "\033[31m"
 
+// currently ctor/dtor feature is not used
 #if DBJ_CLANGNUC
 #define DBJ_CTOR __attribute__((constructor)) 
 #define DBJ_DTOR __attribute__((destructor)) 
@@ -88,41 +119,22 @@ https://godbolt.org/z/4zWs9MhP7
 #define DBJ_DTOR 
 #endif
 
-#ifdef NDEBUG 
-#define NOMEM_POLICY( BOOLEXP_ ) ((void)BOOLEXP_)
-#else // ! NDEBUG == DEBUG
-#define NOMEM_POLICY( BOOLEXP_ ) if (! BOOLEXP_ ) { perror( __FILE__ ", Could not allocate memory!"); exit(-1); }
-#endif // ! NDEBUG
-
-// for when we are sure ARR is the array
-#define DBJ_CNT(ARR) ( sizeof(ARR) / sizeof(ARR[0]) )
-
-#undef MALLOC_WITH_POLICY
-#define MALLOC_WITH_POLICY(PTR_ , SIZE_)  do { PTR_ = malloc( SIZE_); NOMEM_POLICY(PTR_); } while(0)
-
-#undef CALLOC_WITH_POLICY
-#define CALLOC_WITH_POLICY(PTR_ ,R_,C_, SIZE_)  do { PTR_ = calloc(R_ * C_, SIZE_); NOMEM_POLICY(PTR_); } while(0)
-
-#define DBJ_FREE(P_) do { if (P_){ free(P_); P_ = NULL; }  }while(0)
-
-#undef DBJ_API
-#define DBJ_API static
-
 #ifdef _MSC_VER
 #pragma endregion // common trash
 #pragma region common data 
 #endif
-/////////////////////////////////////////////////////////////////////////
-// dimensions
+//
+// dimensions defintions
+
 #if DBJ_BENCHMARKING
 
-// NOTE: here we use stack based prottype design , thus be carefull with sizes
+// NOTE: Be carefull with sizes
 //       UBENCH repeats execution so matrix size is not the prevailing factor
 //       keep them small-ish
-#define DBJ_MX_A_ROWS 0xFF
-#define DBJ_MX_A_COLS 0xFF * 2
+#define DBJ_MX_A_ROWS DBJ_MX_SMALLER_SIDE
+#define DBJ_MX_A_COLS DBJ_MX_SMALLER_SIDE * 2
 #define DBJ_MX_B_ROWS DBJ_MX_A_COLS
-#define DBJ_MX_B_COLS 0xFF * 2
+#define DBJ_MX_B_COLS DBJ_MX_A_ROWS
 
 #else // testing
 	/*
@@ -150,17 +162,31 @@ static_assert(DBJ_MX_B_COLS == DBJ_MX_R_COLS, "DBJ_MX_B_COLS != DBJ_MX_R_COLS");
 typedef double dbj_matrix_data_type;
 #define dbj_matrix_data_type_name "double"
 
-// NOTE: these are compile time typedefs 
-// we can create them here
-// if we do not use Variably Modified Types (VMT)
+// ubench functions have no parameters
+// thus we use common data aka globals
+typedef struct app_data_struct {
+	  unsigned rows_a;
+	  unsigned cols_a;
+	  unsigned rows_b;
+	  unsigned cols_b;
+	  unsigned rows_r;
+	  unsigned cols_r;
+	// transposed B dimension
+	  unsigned rows_bT;
+	  unsigned cols_bT;
+	// the matrixes
+	dbj_matrix_data_type a[DBJ_MX_A_ROWS][DBJ_MX_A_COLS];
+	dbj_matrix_data_type b[DBJ_MX_B_ROWS][DBJ_MX_B_COLS];
+	// transposed b 
+	dbj_matrix_data_type bT[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
+	// the result
+	dbj_matrix_data_type r[DBJ_MX_R_ROWS][DBJ_MX_R_COLS]; 
 
-typedef dbj_matrix_data_type(*dbj_mx_a_pointer)[DBJ_MX_A_COLS][DBJ_MX_A_ROWS];
-typedef dbj_matrix_data_type(*dbj_mx_b_pointer)[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
-typedef dbj_matrix_data_type(*dbj_mx_r_pointer)[DBJ_MX_R_COLS][DBJ_MX_R_ROWS];
+} app_data_type;
 
-typedef dbj_matrix_data_type(*dbj_mx_a_row)[DBJ_MX_A_COLS];
-typedef dbj_matrix_data_type(*dbj_mx_b_row)[DBJ_MX_B_COLS];
-typedef dbj_matrix_data_type(*dbj_mx_r_row)[DBJ_MX_R_COLS];
+static inline void * reset_test_result( app_data_type * app_data_ ) {
+return memset( (void*)app_data_->r, 0, sizeof(dbj_matrix_data_type[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]));    
+} 
 
 #ifdef _MSC_VER
 #pragma endregion // common data 
@@ -169,7 +195,7 @@ typedef dbj_matrix_data_type(*dbj_mx_r_row)[DBJ_MX_R_COLS];
 
 #if DBJ_BENCHMARKING
 
-DBJ_API void* matrix_arr_init
+static void* matrix_arr_init
 (const unsigned rows_a, const unsigned cols_a, dbj_matrix_data_type a[static rows_a][cols_a]) {
 	for (unsigned i = 0; i < rows_a; i++) {
 		for (unsigned j = 0; j < cols_a; j++) {
@@ -182,7 +208,7 @@ DBJ_API void* matrix_arr_init
 
 #define dbj_matrix_size_bytes( rows_, cols_, type_ ) ( rows_ * cols_ * sizeof(type_) )
 
-DBJ_API void dbj_matrix_transpose(
+static void dbj_matrix_transpose(
 	const unsigned rows_m,
 	const unsigned cols_m,
 	const dbj_matrix_data_type m[static rows_m][cols_m],
@@ -195,7 +221,7 @@ DBJ_API void dbj_matrix_transpose(
 	}
 }
 
-DBJ_API dbj_matrix_data_type sdot_1
+static dbj_matrix_data_type sdot_1
 (int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
 {
 	dbj_matrix_data_type s = (dbj_matrix_data_type)0;
@@ -203,7 +229,7 @@ DBJ_API dbj_matrix_data_type sdot_1
 	return s;
 }
 
-DBJ_API dbj_matrix_data_type sdot_8
+static dbj_matrix_data_type sdot_8
 (int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
 {
 	int i, n8 = n >> 3 << 3;
@@ -225,12 +251,11 @@ DBJ_API dbj_matrix_data_type sdot_8
 }
 
 // the most "by the book" C matrix mutliplication function
-// author has added the static keyword for sizes
-// this is using VLA/VMT features
 // the key fact might be this is the matrix mutliplication so 
 // "severley optimized" by compilers there is no point investing
 // in finding faster algorithms, including SSE/AVX usage
-DBJ_API void the_most_by_the_book_matrix_mult(
+// for small matrices of course
+static void the_most_by_the_book_matrix_mult(
 	size_t a_rows,
 	size_t a_cols,
 	size_t b_cols,
@@ -250,10 +275,10 @@ DBJ_API void the_most_by_the_book_matrix_mult(
 
 
 /*
- use 1D aray as matrix type + index calculation of "matrix" [row][col]
+ use 1D aray as matrix type + calculated 1D index of "matrix" [row][col]
  this is in here because it is curiously and persistently the fastest matmul
  */
-DBJ_API dbj_matrix_data_type* matmul_mx_as_array
+static dbj_matrix_data_type* matmul_mx_as_array
 (
 	const size_t a_rows, const size_t a_cols, const size_t b_cols,
 	dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c
@@ -279,7 +304,7 @@ DBJ_API dbj_matrix_data_type* matmul_mx_as_array
 }
 
 /* ---------------------------------------------------------------------------- */
-DBJ_API dbj_matrix_data_type* matmul_mx_as_array_another
+static dbj_matrix_data_type* matmul_mx_as_array_another
 (const size_t a_rows, const size_t a_cols, const size_t b_cols,
 	dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c, dbj_matrix_data_type* bT
 )
@@ -290,7 +315,9 @@ DBJ_API dbj_matrix_data_type* matmul_mx_as_array_another
 	  // const unsigned bt_cols = b_rows ;
 
 	dbj_matrix_data_type* bTR = bT;
+	#if DBJ_MX_ALREADY_TRANSPOSED == 0
 	dbj_matrix_transpose(a_cols, b_cols, (void*)b, (void*)bTR);
+	#endif
 
 	for (unsigned i = 0; i < a_rows; i++) {
 		for (unsigned k = 0; k < b_cols; k++) {
@@ -305,7 +332,7 @@ DBJ_API dbj_matrix_data_type* matmul_mx_as_array_another
 }
 
 // this is VMT based
-DBJ_API void* matmul_transpose_sdot(
+static void* matmul_transpose_sdot(
 	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
 	dbj_matrix_data_type a[static a_rows][a_cols],
 	dbj_matrix_data_type b[static a_cols][b_cols],
@@ -319,7 +346,9 @@ DBJ_API void* matmul_transpose_sdot(
 	// const unsigned bt_cols = b_rows ;
 
 	dbj_matrix_data_type(*bTR)[a_cols] = bT;
+	#if DBJ_MX_ALREADY_TRANSPOSED == 0
 	dbj_matrix_transpose(a_cols, b_cols, (void*)b, (void*)bTR);
+    #endif
 
 	for (unsigned i = 0; i < a_rows; ++i)
 		for (unsigned j = 0; j < b_cols; ++j)
@@ -328,7 +357,7 @@ DBJ_API void* matmul_transpose_sdot(
 	return m;
 }
 
-DBJ_API void* matmul_transpose_sdot_another(
+static void* matmul_transpose_sdot_another(
 	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
 	dbj_matrix_data_type a[static a_rows][a_cols],
 	dbj_matrix_data_type b[static a_cols][b_cols],
@@ -343,7 +372,10 @@ DBJ_API void* matmul_transpose_sdot_another(
 
 	// pointer to bT Row 
 	dbj_matrix_data_type(*bTR)[a_cols] = bT;
+
+	#if DBJ_MX_ALREADY_TRANSPOSED == 0
 	dbj_matrix_transpose(a_cols, b_cols, (void*)b, (void*)bTR);
+#endif
 
 	for (unsigned i = 0; i < a_rows; ++i)
 		for (unsigned j = 0; j < b_cols; ++j)
@@ -357,115 +389,25 @@ DBJ_API void* matmul_transpose_sdot_another(
 #pragma region common for testing or benchmarking
 #endif
 
-// ubench functions have no parameters
-// thus we use common data aka globals
-typedef struct app_data_struct {
-	const unsigned rows_a;
-	const unsigned cols_a;
-	const unsigned rows_b;
-	const unsigned cols_b;
-	const unsigned rows_r;
-	const unsigned cols_r;
-	// transposed B dimension
-	const unsigned rows_bT;
-	const unsigned cols_bT;
-	// the matrixes
-	dbj_matrix_data_type a[DBJ_MX_A_ROWS][DBJ_MX_A_COLS];
-	dbj_matrix_data_type b[DBJ_MX_B_ROWS][DBJ_MX_B_COLS];
-	// transposed b 
-	dbj_matrix_data_type bT[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
-	// the result
-	dbj_matrix_data_type r[DBJ_MX_R_ROWS][DBJ_MX_R_COLS]; /* rezult size is a rows * b cols */
+static app_data_type* app_data = 0;
 
-	// winograd matmul required pre-proc step
-	// we shall do it once for them app_start() function
-	struct winograd_struct {
-		const unsigned row_size;
-		const unsigned col_size;
-		dbj_matrix_data_type row[DBJ_MX_A_ROWS];
-		dbj_matrix_data_type col[DBJ_MX_B_COLS];
-	} winograd;
-
-} app_data_type;
-
-#define reset_test_result() do { \
-dbj_matrix_data_type (*rap)[DBJ_MX_R_ROWS * DBJ_MX_R_COLS] = (void*)app_data->r ; \
-memset( rap, 0, sizeof(dbj_matrix_data_type[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]));    \
-} while (0)
-
-
-
-DBJ_API app_data_type* app_data = 0;
-
-DBJ_API void app_start(void)
+static void app_start(void)
 {
-	// CAUTION : if you declare large dimensions this will take a 
-// lot of stack space. Or just fail.
-	DBJ_API app_data_type app_data_prototype = {
-		.rows_a = DBJ_MX_A_ROWS,
-		.cols_a = DBJ_MX_A_COLS,
-		.rows_b = DBJ_MX_B_ROWS,
-		.cols_b = DBJ_MX_B_COLS,
-		// transposed b dimension
-		.rows_bT = DBJ_MX_B_COLS,
-		.cols_bT = DBJ_MX_B_ROWS ,
+	app_data = calloc(1, sizeof(app_data_type)); assert(app_data);
+
+		app_data->rows_a = DBJ_MX_A_ROWS;
+		app_data->cols_a = DBJ_MX_A_COLS;
+		app_data->rows_b = DBJ_MX_B_ROWS;
+		app_data->cols_b = DBJ_MX_B_COLS;
+		// transposed b 
+		app_data->rows_bT = DBJ_MX_B_COLS;
+		app_data->cols_bT = DBJ_MX_B_ROWS ;
 		/* the result */
-		.rows_r = DBJ_MX_A_ROWS,
-		.cols_r = DBJ_MX_B_COLS,
+		app_data->rows_r = DBJ_MX_A_ROWS;
+		app_data->cols_r = DBJ_MX_B_COLS;
 
-		#if !DBJ_BENCHMARKING
-		// unless we are testing 
-			.a = { {1,2},{3,4} },
-			.b = { {5,6},{7,8} },
-			.bT = { {0,0},{0,0} },
-			.r = { {0,0},{0,0} } ,
-		#endif // !DBJ_BENCHMARKING
-
-		.winograd =
-		{
-			.row_size = DBJ_MX_A_ROWS,
-			.col_size = DBJ_MX_B_COLS
-		}
-	};
-
-	app_data = calloc(1, sizeof(app_data_type));
-
-	if (!app_data) {
-		perror(__FILE__ ", calloc() failed");
-		exit(EXIT_FAILURE);
-	}
-
-	assert(sizeof(*app_data) == sizeof(app_data_prototype));
-
-	void* rez = memcpy(app_data, &app_data_prototype, sizeof app_data_prototype);
-
-	if (!rez) {
-		perror(__FILE__ ", memcpy() failed");
-		exit(EXIT_FAILURE);
-	}
-
-	// here we will do the winograd pre-proc step ONCE
-	// and keep the result
-	winograd_preprocess(
-		app_data->rows_a, app_data->cols_a, app_data->a,
-		app_data->rows_b, app_data->cols_b, app_data->b,
-		app_data->winograd.row_size, app_data->winograd.row,
-		app_data->winograd.col_size, app_data->winograd.col);
-
-#undef DBJ_APP_KIND
-
-#if DBJ_BENCHMARKING
-
-#define DBJ_APP_KIND  "BENCHMARKING"
-
-	matrix_arr_init(app_data->rows_a, app_data->cols_a, app_data->a);
-	matrix_arr_init(app_data->rows_b, app_data->cols_b, app_data->b);
-	// r and bT are zeroed when app_data_prototype was made
-
-#else // TESTING 
-
-#define DBJ_APP_KIND  "TESTING"
-
+	#if !DBJ_BENCHMARKING
+		// testing 
 	/*
 	 *     ! 1 2 |      | 5 6 |       | 19 22 |
 	 *     |     |  x   |     |  =    |       |
@@ -475,14 +417,38 @@ DBJ_API void app_start(void)
 	assert(app_data->rows_b * app_data->cols_b == 4);
 	assert(app_data->rows_r * app_data->cols_r == 4);
 
+	app_data->a[0][0] = 1 ;
+	app_data->a[0][1] = 2 ;
+	app_data->a[1][0] = 3 ;
+	app_data->a[1][1] = 4 ;
+
+	app_data->b[0][0] = 5 ;
+	app_data->b[0][1] = 6 ;
+	app_data->b[1][0] = 7 ;
+	app_data->b[1][1] = 8 ;
+
+	#endif // !DBJ_BENCHMARKING
+
+#if DBJ_BENCHMARKING
+
+#define DBJ_APP_KIND  "BENCHMARKING"
+
+	matrix_arr_init(app_data->rows_a, app_data->cols_a, app_data->a);
+	matrix_arr_init(app_data->rows_b, app_data->cols_b, app_data->b);
+#else
+#define DBJ_APP_KIND  "TESTING"
 #endif // ! DBJ_BENCHMARKING
+
+#if DBJ_MX_ALREADY_TRANSPOSED == 1
+	dbj_matrix_transpose(app_data->rows_b, app_data->cols_b, (void*)app_data->b, (void*)app_data->bT);
+#endif // DBJ_MX_ALREADY_TRANSPOSED 
 
 	const float size_a = dbj_matrix_size_bytes(app_data->rows_a, app_data->cols_a, dbj_matrix_data_type) / 1024.0f;
 	const float size_b = dbj_matrix_size_bytes(app_data->rows_b, app_data->cols_b, dbj_matrix_data_type) / 1024.0f;
 	const float size_bT = dbj_matrix_size_bytes(app_data->rows_bT, app_data->cols_bT, dbj_matrix_data_type) / 1024.0f;
 	const float size_r = dbj_matrix_size_bytes(app_data->rows_r, app_data->cols_r, dbj_matrix_data_type) / 1024.0f;
 
-	fprintf(stderr, "\n\n" DBJ_VT_RED DBJ_APP_KIND " " DBJ_VT_RESET " various matrix multiplication algorithms"
+	fprintf(stderr, "\n\n" DBJ_VT_RED " " DBJ_APP_KIND " " DBJ_VT_RESET " various matrix multiplication algorithms"
 		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj \nTimestamp: %s"
 		"\n\nMatrices are\n"
 		"\nA :%4d * %4d * sizeof(%s) == %4.2f KB"
@@ -498,27 +464,15 @@ DBJ_API void app_start(void)
 #undef DBJ_APP_KIND	
 }
 
-DBJ_API void app_end(void)
+static void app_end(void)
 {
-	DBJ_FREE(app_data);
-
-	printf(" " DBJ_VT_RESET " ");
-
+	free(app_data);
 }
 /////////////////////////////////////////////////////////////////////////
 
 #if DBJ_BENCHMARKING
 
 // rezult reset and checking are done in UTEST's, see bellow
-
-UBENCH(matmul, winograd) {
-	winograd_mult(
-		app_data->rows_a, app_data->cols_a, (void*)app_data->a,
-		app_data->rows_b, app_data->cols_b, (void*)app_data->b,
-		app_data->rows_r, app_data->cols_r, (void*)app_data->r,
-		app_data->winograd.row_size, app_data->winograd.row,
-		app_data->winograd.col_size, app_data->winograd.col);
-}
 
 UBENCH(matmul, matmul_transpose_sdot_another) {
 	matmul_transpose_sdot_another(
@@ -590,19 +544,9 @@ do {\
 	EXPECT_EQ(app_data->r[1][1] , (dbj_matrix_data_type)50);\
 } while(0)
 
-UTEST(matmul, winograd) {
-	reset_test_result();
-	winograd_mult(
-		app_data->rows_a, app_data->cols_a, (void*)app_data->a,
-		app_data->rows_b, app_data->cols_b, (void*)app_data->b,
-		app_data->rows_r, app_data->cols_r, (void*)app_data->r,
-		app_data->winograd.row_size, app_data->winograd.row,
-		app_data->winograd.col_size, app_data->winograd.col);
-	check_test_result();
-}
 
 UTEST(matmul, matmul_transpose_sdot_another) {
-	reset_test_result();
+	reset_test_result(app_data);
 	matmul_transpose_sdot_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
@@ -610,7 +554,7 @@ UTEST(matmul, matmul_transpose_sdot_another) {
 }
 
 UTEST(matmul, matmul_transpose_sdot) {
-	reset_test_result();
+	reset_test_result(app_data);
 	matmul_transpose_sdot(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
@@ -618,7 +562,7 @@ UTEST(matmul, matmul_transpose_sdot) {
 }
 
 UTEST(matmul, matmul_mx_as_array_another) {
-	reset_test_result();
+	reset_test_result(app_data);
 	matmul_mx_as_array_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		(void*)app_data->a,
@@ -630,7 +574,7 @@ UTEST(matmul, matmul_mx_as_array_another) {
 }
 
 UTEST(matmul, matmul_mx_as_array) {
-	reset_test_result();
+	reset_test_result(app_data);
 	matmul_mx_as_array(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		(void*)app_data->a,
@@ -641,7 +585,7 @@ UTEST(matmul, matmul_mx_as_array) {
 }
 
 UTEST(matmul, the_most_by_the_book_matrix_mult) {
-	reset_test_result();
+	reset_test_result(app_data);
 	the_most_by_the_book_matrix_mult(
 		DBJ_MX_A_ROWS,
 		DBJ_MX_B_ROWS,
@@ -653,7 +597,7 @@ UTEST(matmul, the_most_by_the_book_matrix_mult) {
 	check_test_result();
 }
 
-#endif // ! DBJ_BENCHMARKING means tsting
+#endif // testing
 
 #ifdef _MSC_VER
 #pragma region common main
@@ -679,6 +623,10 @@ int main(int argc, const char* const argv[]) {
 #endif // ! DBJ_BENCHMARKING
 
 	app_end();
+
+#if defined(_WIN32)
+	printf(" " DBJ_VT_RESET " ");
+#endif
 }
 #ifdef _MSC_VER
 #pragma endregion // common main
@@ -688,6 +636,4 @@ int main(int argc, const char* const argv[]) {
 #pragma endregion // common for testing or benchmarking
 #endif
 
-#if DBJ_CLANGNUC
-#pragma GCC diagnostic pop
-#endif // DBJ_CLANGNUC
+// EOF
