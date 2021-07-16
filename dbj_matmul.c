@@ -58,11 +58,11 @@ A       |      |      |   R   |      |      |      |  3 rows
 
 // larger side is  * 2
 // ignored for testing, for testing see the data used bellow
-#define DBJ_MX_SMALLER_SIDE 128
+#define DBJ_MX_SMALLER_SIDE 512
 
-// A * B = R 
+// A * B = R
 // few algortihms are using transposed B
-// if A and B are not changed between the calls 
+// if A and B are not changed between the calls
 // another optimisation is to "pre transpose" once
 // Ditto
 #define DBJ_MX_ALREADY_TRANSPOSED 1
@@ -78,7 +78,7 @@ A       |      |      |   R   |      |      |      |  3 rows
 #pragma region common trash
 #endif
 
- /* NDEBUG == RELEASE */
+/* NDEBUG == RELEASE */
 #include <assert.h>
 
 #if (defined(__clang__) || defined(__GNUC__))
@@ -87,41 +87,41 @@ A       |      |      |   R   |      |      |      |  3 rows
 #define DBJ_CLANGNUC 0
 #endif
 
-#if ! DBJ_ON_GODBOLT
-#include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP 
-#   if DBJ_BENCHMARKING
-#   include "ubench.h/ubench.h"
+#if !DBJ_ON_GODBOLT
+#include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP
+#if DBJ_BENCHMARKING
+#include "ubench.h/ubench.h"
 #else
-#   include "utest.h/utest.h"
-#endif  // ! DBJ_BENCHMARKING
+#include "utest.h/utest.h"
+#endif // ! DBJ_BENCHMARKING
 
 #else // on godbolt
 
-#   if DBJ_BENCHMARKING
+#if DBJ_BENCHMARKING
 #include "https://raw.githubusercontent.com/sheredom/ubench.h/master/ubench.h"
 #else
-#   include "https://raw.githubusercontent.com/sheredom/utest.h/master/utest.h"
-#endif  // ! DBJ_BENCHMARKING
-#define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__  
+#include "https://raw.githubusercontent.com/sheredom/utest.h/master/utest.h"
+#endif // ! DBJ_BENCHMARKING
+#define DBJ_BUILD_TIMESTAMP __DATE__ " " __TIME__
 
 #endif // DBJ_ON_GODBOLT
 
 #define DBJ_VT_RESET "\033[0m"
 #define DBJ_VT_GREEN "\033[32m"
-#define DBJ_VT_RED   "\033[31m"
+#define DBJ_VT_RED "\033[31m"
 
 // currently ctor/dtor feature is not used
 #if DBJ_CLANGNUC
-#define DBJ_CTOR __attribute__((constructor)) 
-#define DBJ_DTOR __attribute__((destructor)) 
+#define DBJ_CTOR __attribute__((constructor))
+#define DBJ_DTOR __attribute__((destructor))
 #else
-#define DBJ_CTOR 
-#define DBJ_DTOR 
+#define DBJ_CTOR
+#define DBJ_DTOR
 #endif
 
 #ifdef _MSC_VER
 #pragma endregion // common trash
-#pragma region common data 
+#pragma region common data
 #endif
 //
 // dimensions defintions
@@ -137,7 +137,7 @@ A       |      |      |   R   |      |      |      |  3 rows
 #define DBJ_MX_B_COLS DBJ_MX_A_ROWS
 
 #else // testing
-	/*
+/*
 		 In case of testing we use this constelation
 		 of matrices, to check the correctness of algorithms
 
@@ -153,7 +153,7 @@ A       |      |      |   R   |      |      |      |  3 rows
 #endif // testing
 
 #define DBJ_MX_R_ROWS DBJ_MX_A_ROWS
-#define DBJ_MX_R_COLS DBJ_MX_B_COLS  
+#define DBJ_MX_R_COLS DBJ_MX_B_COLS
 
 static_assert(DBJ_MX_A_COLS == DBJ_MX_B_ROWS, "DBJ_MX_A_COLS != DBJ_MX_B_ROWS");
 static_assert(DBJ_MX_A_ROWS == DBJ_MX_R_ROWS, "DBJ_MX_A_ROWS != DBJ_MX_R_ROWS");
@@ -164,41 +164,45 @@ typedef double dbj_matrix_data_type;
 
 // ubench functions have no parameters
 // thus we use common data aka globals
-typedef struct app_data_struct {
-	  unsigned rows_a;
-	  unsigned cols_a;
-	  unsigned rows_b;
-	  unsigned cols_b;
-	  unsigned rows_r;
-	  unsigned cols_r;
+typedef struct app_data_struct
+{
+	unsigned rows_a;
+	unsigned cols_a;
+	unsigned rows_b;
+	unsigned cols_b;
+	unsigned rows_r;
+	unsigned cols_r;
 	// transposed B dimension
-	  unsigned rows_bT;
-	  unsigned cols_bT;
+	unsigned rows_bT;
+	unsigned cols_bT;
 	// the matrixes
 	dbj_matrix_data_type a[DBJ_MX_A_ROWS][DBJ_MX_A_COLS];
 	dbj_matrix_data_type b[DBJ_MX_B_ROWS][DBJ_MX_B_COLS];
-	// transposed b 
+	// transposed b
 	dbj_matrix_data_type bT[DBJ_MX_B_COLS][DBJ_MX_B_ROWS];
 	// the result
-	dbj_matrix_data_type r[DBJ_MX_R_ROWS][DBJ_MX_R_COLS]; 
+	dbj_matrix_data_type r[DBJ_MX_R_ROWS][DBJ_MX_R_COLS];
 
 } app_data_type;
 
-static inline void * reset_test_result( app_data_type * app_data_ ) {
-return memset( (void*)app_data_->r, 0, sizeof(dbj_matrix_data_type[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]));    
-} 
+static inline void *reset_test_result(app_data_type *app_data_)
+{
+	return memset((void *)app_data_->r, 0, sizeof(dbj_matrix_data_type[DBJ_MX_R_ROWS * DBJ_MX_R_COLS]));
+}
 
 #ifdef _MSC_VER
-#pragma endregion // common data 
+#pragma endregion // common data
 #pragma region matrix functions and various matmuls
 #endif
 
 #if DBJ_BENCHMARKING
 
-static void* matrix_arr_init
-(const unsigned rows_a, const unsigned cols_a, dbj_matrix_data_type a[static rows_a][cols_a]) {
-	for (unsigned i = 0; i < rows_a; i++) {
-		for (unsigned j = 0; j < cols_a; j++) {
+static void *matrix_arr_init(const unsigned rows_a, const unsigned cols_a, dbj_matrix_data_type a[static rows_a][cols_a])
+{
+	for (unsigned i = 0; i < rows_a; i++)
+	{
+		for (unsigned j = 0; j < cols_a; j++)
+		{
 			a[i][j] = (dbj_matrix_data_type)(i * cols_a + j);
 		}
 	}
@@ -206,7 +210,7 @@ static void* matrix_arr_init
 }
 #endif // DBJ_BENCHMARKING
 
-#define dbj_matrix_size_bytes( rows_, cols_, type_ ) ( rows_ * cols_ * sizeof(type_) )
+#define dbj_matrix_size_bytes(rows_, cols_, type_) (rows_ * cols_ * sizeof(type_))
 
 static void dbj_matrix_transpose(
 	const unsigned rows_m,
@@ -214,28 +218,30 @@ static void dbj_matrix_transpose(
 	const dbj_matrix_data_type m[static rows_m][cols_m],
 	dbj_matrix_data_type t[static cols_m][rows_m])
 {
-	for (size_t i = 0; i < rows_m; i++) {
-		for (size_t j = 0; j < cols_m; j++) {
+	for (size_t i = 0; i < rows_m; i++)
+	{
+		for (size_t j = 0; j < cols_m; j++)
+		{
 			t[j][i] = m[i][j];
 		}
 	}
 }
 
-static dbj_matrix_data_type sdot_1
-(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
+static dbj_matrix_data_type sdot_1(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
 {
 	dbj_matrix_data_type s = (dbj_matrix_data_type)0;
-	for (int i = 0; i < n; ++i) s += x[i] * y[i];
+	for (int i = 0; i < n; ++i)
+		s += x[i] * y[i];
 	return s;
 }
 
-static dbj_matrix_data_type sdot_8
-(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
+static dbj_matrix_data_type sdot_8(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
 {
 	int i, n8 = n >> 3 << 3;
-	dbj_matrix_data_type s = (dbj_matrix_data_type)0, t[8] = { (dbj_matrix_data_type)0 };
+	dbj_matrix_data_type s = (dbj_matrix_data_type)0, t[8] = {(dbj_matrix_data_type)0};
 	// t[0] = t[1] = t[2] = t[3] = t[4] = t[5] = t[6] = t[7] = 0.0f;
-	for (i = 0; i < n8; i += 8) {
+	for (i = 0; i < n8; i += 8)
+	{
 		t[0] += x[i + 0] * y[i + 0];
 		t[1] += x[i + 1] * y[i + 1];
 		t[2] += x[i + 2] * y[i + 2];
@@ -245,13 +251,14 @@ static dbj_matrix_data_type sdot_8
 		t[6] += x[i + 6] * y[i + 6];
 		t[7] += x[i + 7] * y[i + 7];
 	}
-	for (s = (dbj_matrix_data_type)0; i < n; ++i) s += x[i] * y[i];
+	for (s = (dbj_matrix_data_type)0; i < n; ++i)
+		s += x[i] * y[i];
 	s += t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7];
 	return s;
 }
 
 // the most "by the book" C matrix mutliplication function
-// the key fact might be this is the matrix mutliplication so 
+// the key fact might be this is the matrix mutliplication so
 // "severley optimized" by compilers there is no point investing
 // in finding faster algorithms, including SSE/AVX usage
 // for small matrices of course
@@ -263,26 +270,26 @@ static void the_most_by_the_book_matrix_mult(
 	dbj_matrix_data_type B[static a_cols][b_cols],
 	dbj_matrix_data_type C[static a_rows][b_cols])
 {
-	for (size_t i = 0; i < a_rows; ++i) {
-		for (size_t j = 0; j < b_cols; ++j) {
+	for (size_t i = 0; i < a_rows; ++i)
+	{
+		for (size_t j = 0; j < b_cols; ++j)
+		{
 			C[i][j] = 0.0;
-			for (size_t l = 0; l < a_cols; ++l) {
+			for (size_t l = 0; l < a_cols; ++l)
+			{
 				C[i][j] += A[i][l] * B[l][j];
 			}
 		}
 	}
 }
 
-
 /*
  use 1D aray as matrix type + calculated 1D index of "matrix" [row][col]
  this is in here because it is curiously and persistently the fastest matmul
  */
-static dbj_matrix_data_type* matmul_mx_as_array
-(
+static dbj_matrix_data_type *matmul_mx_as_array(
 	const size_t a_rows, const size_t a_cols, const size_t b_cols,
-	dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c
-)
+	dbj_matrix_data_type *a, dbj_matrix_data_type *b, dbj_matrix_data_type *c)
 {
 	/*
 	the matmul dimensional requirements
@@ -291,10 +298,13 @@ static dbj_matrix_data_type* matmul_mx_as_array
 	R rows    == A rows
 	R columns == B columns
 	*/
-	for (size_t i = 0; i < a_rows; i++) {
-		for (size_t k = 0; k < b_cols; k++) {
+	for (size_t i = 0; i < a_rows; i++)
+	{
+		for (size_t k = 0; k < b_cols; k++)
+		{
 			dbj_matrix_data_type sum = (dbj_matrix_data_type)0.0;
-			for (size_t j = 0; j < a_cols /* same as b rows */; j++) {
+			for (size_t j = 0; j < a_cols /* same as b rows */; j++)
+			{
 				sum += a[i * a_cols + j] * b[j * a_rows + k];
 			}
 			c[i * a_rows + k] = sum;
@@ -304,25 +314,26 @@ static dbj_matrix_data_type* matmul_mx_as_array
 }
 
 /* ---------------------------------------------------------------------------- */
-static dbj_matrix_data_type* matmul_mx_as_array_another
-(const size_t a_rows, const size_t a_cols, const size_t b_cols,
-	dbj_matrix_data_type* a, dbj_matrix_data_type* b, dbj_matrix_data_type* c, dbj_matrix_data_type* bT
-)
+static dbj_matrix_data_type *matmul_mx_as_array_another(const size_t a_rows, const size_t a_cols, const size_t b_cols,
+														dbj_matrix_data_type *a, dbj_matrix_data_type *b, dbj_matrix_data_type *c, dbj_matrix_data_type *bT)
 {
 	// orinteering
-	  // const unsigned b_rows  = a_cols;
-	  // const unsigned bt_rows = b_cols;
-	  // const unsigned bt_cols = b_rows ;
+	// const unsigned b_rows  = a_cols;
+	// const unsigned bt_rows = b_cols;
+	// const unsigned bt_cols = b_rows ;
 
-	dbj_matrix_data_type* bTR = bT;
-	#if DBJ_MX_ALREADY_TRANSPOSED == 0
-	dbj_matrix_transpose(a_cols, b_cols, (void*)b, (void*)bTR);
-	#endif
+	dbj_matrix_data_type *bTR = bT;
+#if DBJ_MX_ALREADY_TRANSPOSED == 0
+	dbj_matrix_transpose(a_cols, b_cols, (void *)b, (void *)bTR);
+#endif
 
-	for (unsigned i = 0; i < a_rows; i++) {
-		for (unsigned k = 0; k < b_cols; k++) {
+	for (unsigned i = 0; i < a_rows; i++)
+	{
+		for (unsigned k = 0; k < b_cols; k++)
+		{
 			dbj_matrix_data_type sum = 0.0;
-			for (unsigned j = 0; j < a_cols; j++) {
+			for (unsigned j = 0; j < a_cols; j++)
+			{
 				sum += a[i * a_cols + j] * bTR[k * b_cols + j];
 			}
 			c[i * b_cols + k] = sum;
@@ -332,23 +343,22 @@ static dbj_matrix_data_type* matmul_mx_as_array_another
 }
 
 // this is VMT based
-static void* matmul_transpose_sdot(
+static void *matmul_transpose_sdot(
 	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
 	dbj_matrix_data_type a[static a_rows][a_cols],
 	dbj_matrix_data_type b[static a_cols][b_cols],
 	dbj_matrix_data_type m[static a_rows][b_cols],
 	// allocated space for transposed b
-	dbj_matrix_data_type bT[static b_cols][a_cols]
-)
-{   // orinteering
+	dbj_matrix_data_type bT[static b_cols][a_cols])
+{ // orinteering
 	// const unsigned b_rows  = a_cols;
 	// const unsigned bt_rows = b_cols;
 	// const unsigned bt_cols = b_rows ;
 
 	dbj_matrix_data_type(*bTR)[a_cols] = bT;
-	#if DBJ_MX_ALREADY_TRANSPOSED == 0
-	dbj_matrix_transpose(a_cols, b_cols, (void*)b, (void*)bTR);
-    #endif
+#if DBJ_MX_ALREADY_TRANSPOSED == 0
+	dbj_matrix_transpose(a_cols, b_cols, (void *)b, (void *)bTR);
+#endif
 
 	for (unsigned i = 0; i < a_rows; ++i)
 		for (unsigned j = 0; j < b_cols; ++j)
@@ -357,24 +367,23 @@ static void* matmul_transpose_sdot(
 	return m;
 }
 
-static void* matmul_transpose_sdot_another(
+static void *matmul_transpose_sdot_another(
 	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
 	dbj_matrix_data_type a[static a_rows][a_cols],
 	dbj_matrix_data_type b[static a_cols][b_cols],
 	dbj_matrix_data_type m[static a_rows][b_cols],
 	// allocated space for transposed b
-	dbj_matrix_data_type bT[static b_cols][a_cols]
-)
-{   // orienteering
+	dbj_matrix_data_type bT[static b_cols][a_cols])
+{ // orienteering
 	// const unsigned b_rows  = a_cols;
 	// const unsigned bt_rows = b_cols;
 	// const unsigned bt_cols = b_rows ;
 
-	// pointer to bT Row 
+	// pointer to bT Row
 	dbj_matrix_data_type(*bTR)[a_cols] = bT;
 
-	#if DBJ_MX_ALREADY_TRANSPOSED == 0
-	dbj_matrix_transpose(a_cols, b_cols, (void*)b, (void*)bTR);
+#if DBJ_MX_ALREADY_TRANSPOSED == 0
+	dbj_matrix_transpose(a_cols, b_cols, (void *)b, (void *)bTR);
 #endif
 
 	for (unsigned i = 0; i < a_rows; ++i)
@@ -383,31 +392,31 @@ static void* matmul_transpose_sdot_another(
 	return m;
 }
 
-
 #ifdef _MSC_VER
 #pragma endregion // matrix functions and various matmuls
 #pragma region common for testing or benchmarking
 #endif
 
-static app_data_type* app_data = 0;
+static app_data_type *app_data = 0;
 
 static void app_start(void)
 {
-	app_data = calloc(1, sizeof(app_data_type)); assert(app_data);
+	app_data = calloc(1, sizeof(app_data_type));
+	assert(app_data);
 
-		app_data->rows_a = DBJ_MX_A_ROWS;
-		app_data->cols_a = DBJ_MX_A_COLS;
-		app_data->rows_b = DBJ_MX_B_ROWS;
-		app_data->cols_b = DBJ_MX_B_COLS;
-		// transposed b 
-		app_data->rows_bT = DBJ_MX_B_COLS;
-		app_data->cols_bT = DBJ_MX_B_ROWS ;
-		/* the result */
-		app_data->rows_r = DBJ_MX_A_ROWS;
-		app_data->cols_r = DBJ_MX_B_COLS;
+	app_data->rows_a = DBJ_MX_A_ROWS;
+	app_data->cols_a = DBJ_MX_A_COLS;
+	app_data->rows_b = DBJ_MX_B_ROWS;
+	app_data->cols_b = DBJ_MX_B_COLS;
+	// transposed b
+	app_data->rows_bT = DBJ_MX_B_COLS;
+	app_data->cols_bT = DBJ_MX_B_ROWS;
+	/* the result */
+	app_data->rows_r = DBJ_MX_A_ROWS;
+	app_data->cols_r = DBJ_MX_B_COLS;
 
-	#if !DBJ_BENCHMARKING
-		// testing 
+#if !DBJ_BENCHMARKING
+	// testing
 	/*
 	 *     ! 1 2 |      | 5 6 |       | 19 22 |
 	 *     |     |  x   |     |  =    |       |
@@ -417,31 +426,31 @@ static void app_start(void)
 	assert(app_data->rows_b * app_data->cols_b == 4);
 	assert(app_data->rows_r * app_data->cols_r == 4);
 
-	app_data->a[0][0] = 1 ;
-	app_data->a[0][1] = 2 ;
-	app_data->a[1][0] = 3 ;
-	app_data->a[1][1] = 4 ;
+	app_data->a[0][0] = 1;
+	app_data->a[0][1] = 2;
+	app_data->a[1][0] = 3;
+	app_data->a[1][1] = 4;
 
-	app_data->b[0][0] = 5 ;
-	app_data->b[0][1] = 6 ;
-	app_data->b[1][0] = 7 ;
-	app_data->b[1][1] = 8 ;
+	app_data->b[0][0] = 5;
+	app_data->b[0][1] = 6;
+	app_data->b[1][0] = 7;
+	app_data->b[1][1] = 8;
 
-	#endif // !DBJ_BENCHMARKING
+#endif // !DBJ_BENCHMARKING
 
 #if DBJ_BENCHMARKING
 
-#define DBJ_APP_KIND  "BENCHMARKING"
+#define DBJ_APP_KIND "BENCHMARKING"
 
 	matrix_arr_init(app_data->rows_a, app_data->cols_a, app_data->a);
 	matrix_arr_init(app_data->rows_b, app_data->cols_b, app_data->b);
 #else
-#define DBJ_APP_KIND  "TESTING"
+#define DBJ_APP_KIND "TESTING"
 #endif // ! DBJ_BENCHMARKING
 
 #if DBJ_MX_ALREADY_TRANSPOSED == 1
-	dbj_matrix_transpose(app_data->rows_b, app_data->cols_b, (void*)app_data->b, (void*)app_data->bT);
-#endif // DBJ_MX_ALREADY_TRANSPOSED 
+	dbj_matrix_transpose(app_data->rows_b, app_data->cols_b, (void *)app_data->b, (void *)app_data->bT);
+#endif // DBJ_MX_ALREADY_TRANSPOSED
 
 	const float size_a = dbj_matrix_size_bytes(app_data->rows_a, app_data->cols_a, dbj_matrix_data_type) / 1024.0f;
 	const float size_b = dbj_matrix_size_bytes(app_data->rows_b, app_data->cols_b, dbj_matrix_data_type) / 1024.0f;
@@ -449,19 +458,18 @@ static void app_start(void)
 	const float size_r = dbj_matrix_size_bytes(app_data->rows_r, app_data->cols_r, dbj_matrix_data_type) / 1024.0f;
 
 	fprintf(stderr, "\n\n" DBJ_VT_RED " " DBJ_APP_KIND " " DBJ_VT_RESET " various matrix multiplication algorithms"
-		"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj \nTimestamp: %s"
-		"\n\nMatrices are\n"
-		"\nA :%4d * %4d * sizeof(%s) == %4.2f KB"
-		"\nB :%4d * %4d * sizeof(%s) == %4.2f KB"
-		"\nbT:%4d * %4d * sizeof(%s) == %4.2f KB"
-		"\nR :%4d * %4d * sizeof(%s) == %4.2f KB\n\n" DBJ_VT_RESET
-		, DBJ_BUILD_TIMESTAMP,
-		app_data->rows_a, app_data->cols_a, dbj_matrix_data_type_name, size_a,
-		app_data->rows_b, app_data->cols_b, dbj_matrix_data_type_name, size_b,
-		app_data->rows_bT, app_data->cols_bT, dbj_matrix_data_type_name, size_bT,
-		app_data->rows_r, app_data->cols_r, dbj_matrix_data_type_name, size_r
-	);
-#undef DBJ_APP_KIND	
+					"\n(c) 2021 by dbj dot org, https://dbj.org/license_dbj \nTimestamp: %s"
+					"\n\nMatrices are\n"
+					"\nA :%4d * %4d * sizeof(%s) == %4.2f KB"
+					"\nB :%4d * %4d * sizeof(%s) == %4.2f KB"
+					"\nbT:%4d * %4d * sizeof(%s) == %4.2f KB"
+					"\nR :%4d * %4d * sizeof(%s) == %4.2f KB\n\n" DBJ_VT_RESET,
+			DBJ_BUILD_TIMESTAMP,
+			app_data->rows_a, app_data->cols_a, dbj_matrix_data_type_name, size_a,
+			app_data->rows_b, app_data->cols_b, dbj_matrix_data_type_name, size_b,
+			app_data->rows_bT, app_data->cols_bT, dbj_matrix_data_type_name, size_bT,
+			app_data->rows_r, app_data->cols_r, dbj_matrix_data_type_name, size_r);
+#undef DBJ_APP_KIND
 }
 
 static void app_end(void)
@@ -474,35 +482,37 @@ static void app_end(void)
 
 // rezult reset and checking are done in UTEST's, see bellow
 
-UBENCH(matmul, matmul_transpose_sdot_another) {
+UBENCH(matmul, matmul_transpose_sdot_another)
+{
 	matmul_transpose_sdot_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 }
 
-UBENCH(matmul, matmul_transpose_sdot) {
+UBENCH(matmul, matmul_transpose_sdot)
+{
 	matmul_transpose_sdot(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 }
 
-UBENCH(matmul, matmul_mx_as_array_another) {
+UBENCH(matmul, matmul_mx_as_array_another)
+{
 	matmul_mx_as_array_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		(void*)app_data->a,
-		(void*)app_data->b,
-		(void*)app_data->r,
-		(void*)app_data->bT
-	);
+		(void *)app_data->a,
+		(void *)app_data->b,
+		(void *)app_data->r,
+		(void *)app_data->bT);
 }
 
-UBENCH(matmul, matmul_mx_as_array) {
+UBENCH(matmul, matmul_mx_as_array)
+{
 	matmul_mx_as_array(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		(void*)app_data->a,
-		(void*)app_data->b,
-		(void*)app_data->r
-	);
+		(void *)app_data->a,
+		(void *)app_data->b,
+		(void *)app_data->r);
 }
 
 UBENCH(matmul, the_most_by_the_book_matrix_mult)
@@ -513,8 +523,7 @@ UBENCH(matmul, the_most_by_the_book_matrix_mult)
 		DBJ_MX_B_COLS,
 		app_data->a,
 		app_data->b,
-		app_data->r
-	);
+		app_data->r);
 }
 
 #else // testing /////////////////////////////////////////////////////
@@ -523,29 +532,31 @@ UBENCH(matmul, the_most_by_the_book_matrix_mult)
  *     |     |  x   |     |  =    |       |
  *     | 3 4 |      | 7 8 |       | 43 50 |
  */
-#define check_test_input() \
-do {\
-	EXPECT_EQ(app_data->a[0][0] , (dbj_matrix_data_type)1);\
-	EXPECT_EQ(app_data->a[0][1] , (dbj_matrix_data_type)2);\
-	EXPECT_EQ(app_data->a[1][0] , (dbj_matrix_data_type)3);\
-	EXPECT_EQ(app_data->a[1][1] , (dbj_matrix_data_type)4);\
-\
-	EXPECT_EQ(app_data->b[0][0] , (dbj_matrix_data_type)5);\
-	EXPECT_EQ(app_data->b[0][1] , (dbj_matrix_data_type)6);\
-	EXPECT_EQ(app_data->b[1][0] , (dbj_matrix_data_type)7);\
-	EXPECT_EQ(app_data->b[1][1] , (dbj_matrix_data_type)8);\
-} while(0)
+#define check_test_input()                                     \
+	do                                                         \
+	{                                                          \
+		EXPECT_EQ(app_data->a[0][0], (dbj_matrix_data_type)1); \
+		EXPECT_EQ(app_data->a[0][1], (dbj_matrix_data_type)2); \
+		EXPECT_EQ(app_data->a[1][0], (dbj_matrix_data_type)3); \
+		EXPECT_EQ(app_data->a[1][1], (dbj_matrix_data_type)4); \
+                                                               \
+		EXPECT_EQ(app_data->b[0][0], (dbj_matrix_data_type)5); \
+		EXPECT_EQ(app_data->b[0][1], (dbj_matrix_data_type)6); \
+		EXPECT_EQ(app_data->b[1][0], (dbj_matrix_data_type)7); \
+		EXPECT_EQ(app_data->b[1][1], (dbj_matrix_data_type)8); \
+	} while (0)
 
-#define check_test_result() \
-do {\
-	EXPECT_EQ(app_data->r[0][0] , (dbj_matrix_data_type)19);\
-	EXPECT_EQ(app_data->r[0][1] , (dbj_matrix_data_type)22);\
-	EXPECT_EQ(app_data->r[1][0] , (dbj_matrix_data_type)43);\
-	EXPECT_EQ(app_data->r[1][1] , (dbj_matrix_data_type)50);\
-} while(0)
+#define check_test_result()                                     \
+	do                                                          \
+	{                                                           \
+		EXPECT_EQ(app_data->r[0][0], (dbj_matrix_data_type)19); \
+		EXPECT_EQ(app_data->r[0][1], (dbj_matrix_data_type)22); \
+		EXPECT_EQ(app_data->r[1][0], (dbj_matrix_data_type)43); \
+		EXPECT_EQ(app_data->r[1][1], (dbj_matrix_data_type)50); \
+	} while (0)
 
-
-UTEST(matmul, matmul_transpose_sdot_another) {
+UTEST(matmul, matmul_transpose_sdot_another)
+{
 	reset_test_result(app_data);
 	matmul_transpose_sdot_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
@@ -553,7 +564,8 @@ UTEST(matmul, matmul_transpose_sdot_another) {
 	check_test_result();
 }
 
-UTEST(matmul, matmul_transpose_sdot) {
+UTEST(matmul, matmul_transpose_sdot)
+{
 	reset_test_result(app_data);
 	matmul_transpose_sdot(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
@@ -561,30 +573,31 @@ UTEST(matmul, matmul_transpose_sdot) {
 	check_test_result();
 }
 
-UTEST(matmul, matmul_mx_as_array_another) {
+UTEST(matmul, matmul_mx_as_array_another)
+{
 	reset_test_result(app_data);
 	matmul_mx_as_array_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		(void*)app_data->a,
-		(void*)app_data->b,
-		(void*)app_data->r,
-		(void*)app_data->bT
-	);
+		(void *)app_data->a,
+		(void *)app_data->b,
+		(void *)app_data->r,
+		(void *)app_data->bT);
 	check_test_result();
 }
 
-UTEST(matmul, matmul_mx_as_array) {
+UTEST(matmul, matmul_mx_as_array)
+{
 	reset_test_result(app_data);
 	matmul_mx_as_array(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-		(void*)app_data->a,
-		(void*)app_data->b,
-		(void*)app_data->r
-	);
+		(void *)app_data->a,
+		(void *)app_data->b,
+		(void *)app_data->r);
 	check_test_result();
 }
 
-UTEST(matmul, the_most_by_the_book_matrix_mult) {
+UTEST(matmul, the_most_by_the_book_matrix_mult)
+{
 	reset_test_result(app_data);
 	the_most_by_the_book_matrix_mult(
 		DBJ_MX_A_ROWS,
@@ -592,8 +605,7 @@ UTEST(matmul, the_most_by_the_book_matrix_mult) {
 		DBJ_MX_A_COLS,
 		app_data->a,
 		app_data->b,
-		app_data->r
-	);
+		app_data->r);
 	check_test_result();
 }
 
@@ -603,22 +615,23 @@ UTEST(matmul, the_most_by_the_book_matrix_mult) {
 #pragma region common main
 #endif
 
-#if  DBJ_BENCHMARKING
+#if DBJ_BENCHMARKING
 UBENCH_STATE();
-#else // ! DBJ_BENCHMARKING
+#else  // ! DBJ_BENCHMARKING
 UTEST_STATE();
 #endif // ! DBJ_BENCHMARKING
 
-int main(int argc, const char* const argv[]) {
+int main(int argc, const char *const argv[])
+{
 #if defined(_WIN32)
 	// VT100 ESC codes kick-start
 	system(" ");
 #endif
 	app_start();
 
-#if  DBJ_BENCHMARKING
+#if DBJ_BENCHMARKING
 	return ubench_main(argc, argv);
-#else // ! DBJ_BENCHMARKING
+#else  // ! DBJ_BENCHMARKING
 	return utest_main(argc, argv);
 #endif // ! DBJ_BENCHMARKING
 
