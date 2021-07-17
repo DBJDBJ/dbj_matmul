@@ -1,6 +1,8 @@
 /*
+ (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj/
 
 https://godbolt.org/z/4zWs9MhP7
+https://godbolt.org/z/1KTE3PnEP
 
  This is benchmarking of a collection of matrix multiplication algorithms.
  Algorithms are kept as simple as possible. No structs are passed as arguments.
@@ -13,52 +15,68 @@ https://godbolt.org/z/4zWs9MhP7
  Keep in mind compiler has the easiest job optimizing the simplest code.
 
 For smaller matrices it is almost irrelevant which algorithm is used
-what is "smaller" depends on the runtime. 
+Were what is "smaller" depends on the runtime.
+
 Generally up to 1024 x 1024 the best algorithm from here would suffice
 above that use BLAS or LAPAC or one of the many variants of them two.
 GPU's have matmuls "on board" so that is another option; for that see CUDA
 
  Use this file to recompile and re measure whenever selecting
- the right matrix multiplication algorithm for a new platform 
+ the right matrix multiplication algorithm for a new platform
 
- https://godbolt.org/z/1KTE3PnEP
+ Here is one run on a WIN10 PRO machine, 8GB RAM , and one very old i5 CPU model
 
- (c) 2021 by dbj at dbj dot org -- https://dbj.org/license_dbj/
+[==========] Running 5 benchmarks.
+[ RUN      ] matmul.the_most_by_the_book_matrix_mult
+[       OK ] matmul.the_most_by_the_book_matrix_mult (mean 1.885s, confidence interval +- 0.117107%)
+[ RUN      ] matmul.matmul_mx_as_array
+[       OK ] matmul.matmul_mx_as_array (mean 1.956s, confidence interval +- 0.795940%)
+[ RUN      ] matmul.matmul_mx_as_array_another
+[       OK ] matmul.matmul_mx_as_array_another (mean 227.829ms, confidence interval +- 0.472907%)
+[ RUN      ] matmul.matmul_sdot8
+[       OK ] matmul.matmul_sdot8 (mean 413.246ms, confidence interval +- 0.523624%)
+[ RUN      ] matmul.matmul_transpose_sdot_another
+[       OK ] matmul.matmul_transpose_sdot_another (mean 237.796ms, confidence interval +- 0.628446%)
+[==========] 5 benchmarks ran.
+[  PASSED  ] 5 benchmarks.
+
+OMP. What OMP? OMP might help but on *very* large data sets. Were using GPU is much more reasonable anyway.
+Here is a code you can try on your machine with large `DATA_SIZE`: https://godbolt.org/z/fTqTsc5vs
 
 
 Matrix multiplication required dimensions relationship
 
 A(3,2) x B(2,3) = R(3,3)
-                              +------+------+------+
-                              |      |      |      |
-                              |      |      |      |
-                              |      |      |      |
-                         B    +--------------------+  2 rows
-                              |      |      |      |
-                              |      |      |      |
-                              |      |      |      |
-                              +------+------+------+
+							  +------+------+------+
+							  |      |      |      |
+							  |      |      |      |
+							  |      |      |      |
+						 B    +--------------------+  2 rows
+							  |      |      |      |
+							  |      |      |      |
+							  |      |      |      |
+							  +------+------+------+
 
-            2 columns              3 columns
+			2 columns              3 columns
 
-        +------+------+       +------+------+------+
-        |      |      |       |      |      |      |
-3 rows  |      |      |       |      |      |      |  
-        |      |      |       |      |      |      |
-        +-------------+       +--------------------+
-        |      |      |       |      |      |      |
+		+------+------+       +------+------+------+
+		|      |      |       |      |      |      |
+3 rows  |      |      |       |      |      |      |
+		|      |      |       |      |      |      |
+		+-------------+       +--------------------+
+		|      |      |       |      |      |      |
 A       |      |      |   R   |      |      |      |  3 rows
-        |      |      |       |      |      |      |
-        +-------------+       +--------------------+
-        |      |      |       |      |      |      |
-        |      |      |       |      |      |      |
-        |      |      |       |      |      |      |
-        +------+------+       +------+------+------+
+		|      |      |       |      |      |      |
+		+-------------+       +--------------------+
+		|      |      |       |      |      |      |
+		|      |      |       |      |      |      |
+		|      |      |       |      |      |      |
+		+------+------+       +------+------+------+
 */
 
 // larger side is  * 2
 // ignored for testing, for testing see the data used bellow
-#define DBJ_MX_SMALLER_SIDE 512
+#define DBJ_MX_SMALLER_SIDE 256
 
 // A * B = R
 // few algortihms are using transposed B
@@ -227,7 +245,7 @@ static void dbj_matrix_transpose(
 	}
 }
 
-static dbj_matrix_data_type sdot_1(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
+inline dbj_matrix_data_type sdot_1(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
 {
 	dbj_matrix_data_type s = (dbj_matrix_data_type)0;
 	for (int i = 0; i < n; ++i)
@@ -235,7 +253,7 @@ static dbj_matrix_data_type sdot_1(int n, const dbj_matrix_data_type x[static n]
 	return s;
 }
 
-static dbj_matrix_data_type sdot_8(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
+inline dbj_matrix_data_type sdot_8(int n, const dbj_matrix_data_type x[static n], const dbj_matrix_data_type y[static n])
 {
 	int i, n8 = n >> 3 << 3;
 	dbj_matrix_data_type s = (dbj_matrix_data_type)0, t[8] = {(dbj_matrix_data_type)0};
@@ -343,7 +361,7 @@ static dbj_matrix_data_type *matmul_mx_as_array_another(const size_t a_rows, con
 }
 
 // this is VMT based
-static void *matmul_transpose_sdot(
+static void *matmul_sdot8(
 	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
 	dbj_matrix_data_type a[static a_rows][a_cols],
 	dbj_matrix_data_type b[static a_cols][b_cols],
@@ -351,11 +369,9 @@ static void *matmul_transpose_sdot(
 	// allocated space for transposed b
 	dbj_matrix_data_type bT[static b_cols][a_cols])
 { // orinteering
-	// const unsigned b_rows  = a_cols;
-	// const unsigned bt_rows = b_cols;
-	// const unsigned bt_cols = b_rows ;
 
-	dbj_matrix_data_type(*bTR)[a_cols] = bT;
+	dbj_matrix_data_type(*bTR)[a_cols] = bT; // row view on bT
+
 #if DBJ_MX_ALREADY_TRANSPOSED == 0
 	dbj_matrix_transpose(a_cols, b_cols, (void *)b, (void *)bTR);
 #endif
@@ -474,7 +490,11 @@ static void app_start(void)
 
 static void app_end(void)
 {
-	free(app_data);
+	if (app_data)
+	{
+		free(app_data);
+		app_data = 0;
+	}
 }
 /////////////////////////////////////////////////////////////////////////
 
@@ -482,21 +502,21 @@ static void app_end(void)
 
 // rezult reset and checking are done in UTEST's, see bellow
 
-UBENCH(matmul, matmul_transpose_sdot_another)
+UBENCH(matmul, transpose_sdot_another)
 {
 	matmul_transpose_sdot_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 }
 
-UBENCH(matmul, matmul_transpose_sdot)
+UBENCH(matmul, transpose_and_sdot8)
 {
-	matmul_transpose_sdot(
+	matmul_sdot8(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 }
 
-UBENCH(matmul, matmul_mx_as_array_another)
+UBENCH(matmul, mx_as_array_another)
 {
 	matmul_mx_as_array_another(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
@@ -506,7 +526,7 @@ UBENCH(matmul, matmul_mx_as_array_another)
 		(void *)app_data->bT);
 }
 
-UBENCH(matmul, matmul_mx_as_array)
+UBENCH(matmul, mx_as_array)
 {
 	matmul_mx_as_array(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
@@ -555,7 +575,7 @@ UBENCH(matmul, the_most_by_the_book_matrix_mult)
 		EXPECT_EQ(app_data->r[1][1], (dbj_matrix_data_type)50); \
 	} while (0)
 
-UTEST(matmul, matmul_transpose_sdot_another)
+UTEST(matmul, transpose_sdot_another)
 {
 	reset_test_result(app_data);
 	matmul_transpose_sdot_another(
@@ -564,16 +584,16 @@ UTEST(matmul, matmul_transpose_sdot_another)
 	check_test_result();
 }
 
-UTEST(matmul, matmul_transpose_sdot)
+UTEST(matmul, transpose_and_sdot8)
 {
 	reset_test_result(app_data);
-	matmul_transpose_sdot(
+	matmul_sdot8(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 	check_test_result();
 }
 
-UTEST(matmul, matmul_mx_as_array_another)
+UTEST(matmul, mx_as_array_another)
 {
 	reset_test_result(app_data);
 	matmul_mx_as_array_another(
@@ -585,7 +605,7 @@ UTEST(matmul, matmul_mx_as_array_another)
 	check_test_result();
 }
 
-UTEST(matmul, matmul_mx_as_array)
+UTEST(matmul, mx_as_array)
 {
 	reset_test_result(app_data);
 	matmul_mx_as_array(
@@ -630,9 +650,9 @@ int main(int argc, const char *const argv[])
 	app_start();
 
 #if DBJ_BENCHMARKING
-	return ubench_main(argc, argv);
+	ubench_main(argc, argv);
 #else  // ! DBJ_BENCHMARKING
-	return utest_main(argc, argv);
+	utest_main(argc, argv);
 #endif // ! DBJ_BENCHMARKING
 
 	app_end();
@@ -640,6 +660,7 @@ int main(int argc, const char *const argv[])
 #if defined(_WIN32)
 	printf(" " DBJ_VT_RESET " ");
 #endif
+	return 42;
 }
 #ifdef _MSC_VER
 #pragma endregion // common main
