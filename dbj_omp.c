@@ -26,9 +26,9 @@
 #if !DBJ_ON_GODBOLT
 #include "build_time_stamp.inc" // DBJ_BUILD_TIMESTAMP
 #if DBJ_BENCHMARKING
-#include "ubench.h/ubench.h"
+#include "ubench/ubench.h"
 #else
-#include "utest.h/utest.h"
+#include "utest/utest.h"
 #endif // ! DBJ_BENCHMARKING
 
 #else // on godbolt
@@ -67,59 +67,47 @@ too much for WIN10 8GB RAM
 #define N_THREADS 2
 #define range DATA_SIZE / N_THREADS
 
-static struct
-{
-    double *X; // [DATA_SIZE];
-    double *Y; // [DATA_SIZE];
+static struct {
+  double *X; // [DATA_SIZE];
+  double *Y; // [DATA_SIZE];
 } *app_data = 0;
 
-static void app_start(int argc, const char *const argv[])
-{
-    app_data = calloc(1, sizeof(*app_data));
-    assert(app_data);
+static void app_start(int argc, const char *const argv[]) {
+  app_data = calloc(1, sizeof(*app_data));
+  assert(app_data);
 
-    app_data->X = calloc(DATA_SIZE, sizeof(double));
-    assert(app_data->X);
+  app_data->X = calloc(DATA_SIZE, sizeof(double));
+  assert(app_data->X);
 
-    app_data->Y = calloc(DATA_SIZE, sizeof(double));
-    assert(app_data->Y);
+  app_data->Y = calloc(DATA_SIZE, sizeof(double));
+  assert(app_data->Y);
 
-    FOR(i, DATA_SIZE)
-    {
-        app_data->X[i] = 1.0;
-        app_data->Y[i] = 2.0;
-    }
+  FOR(i, DATA_SIZE) {
+    app_data->X[i] = 1.0;
+    app_data->Y[i] = 2.0;
+  }
 
-    printf("\nStarting %s", argv[0]);
-    printf("\nMeasuring: double[%d] /= double[%d]\n\n", DATA_SIZE, DATA_SIZE);
+  printf("\nStarting %s", argv[0]);
+  printf("\nMeasuring: double[%d] /= double[%d]\n\n", DATA_SIZE, DATA_SIZE);
 }
 
-static void app_end(void)
-{
-    free(app_data->X);
-    free(app_data->Y);
-    free(app_data);
+static void app_end(void) {
+  free(app_data->X);
+  free(app_data->Y);
+  free(app_data);
 }
 
 #ifdef _MSC_VER
 #pragma range benches
 #endif
 
-UBENCH(omp_measuring, adding_two_arrays_of_doubles)
-{
+UBENCH(omp_measuring, adding_two_arrays_of_doubles) {
 #pragma omp parallel for num_threads(N_THREADS)
-    FOR(i, DATA_SIZE)
-    {
-        app_data->X[i] /= app_data->Y[i];
-    }
+  FOR(i, DATA_SIZE) { app_data->X[i] /= app_data->Y[i]; }
 }
 
-UBENCH(NOT_omp_measuring, adding_two_arrays_of_doubles)
-{
-    FOR(i, DATA_SIZE)
-    {
-        app_data->X[i] /= app_data->Y[i];
-    }
+UBENCH(NOT_omp_measuring, adding_two_arrays_of_doubles) {
+  FOR(i, DATA_SIZE) { app_data->X[i] /= app_data->Y[i]; }
 }
 
 #ifdef _MSC_VER
@@ -128,9 +116,8 @@ UBENCH(NOT_omp_measuring, adding_two_arrays_of_doubles)
 
 UBENCH_STATE();
 
-int main(int argc, const char *const argv[])
-{
-    app_start(argc, argv);
-    return ubench_main(argc, argv);
-    app_end();
+int main(int argc, const char *const argv[]) {
+  app_start(argc, argv);
+  return ubench_main(argc, argv);
+  app_end();
 }
