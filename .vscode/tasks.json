@@ -6,10 +6,11 @@
 			"label": "C/C++: gcc.exe build active file",
 			"command": "D:\\PROD\\TDM-GCC-64\\bin\\gcc.exe",
 			"args": [
+				"-fopenmp",
 				"-s",
 				"-O3",
-				 /* "-g", */ 
-				"-Wall", 
+				/* "-g", */
+				"-Wall",
 				"-pedantic",
 				"${file}",
 				"-o",

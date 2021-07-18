@@ -1,6 +1,0 @@
-[submodule "ubench.h"]
-	path = ubench.h
-	url = https://github.com/sheredom/ubench.h.git
-[submodule "utest.h"]
-	path = utest.h
-	url = https://github.com/sheredom/utest.h
