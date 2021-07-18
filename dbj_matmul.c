@@ -35,8 +35,8 @@ GPU's have matmuls "on board" so that is another option; for that see CUDA
 [       OK ] matmul.matmul_mx_as_array_another (mean 227.829ms, confidence interval +- 0.472907%)
 [ RUN      ] matmul.matmul_sdot8
 [       OK ] matmul.matmul_sdot8 (mean 413.246ms, confidence interval +- 0.523624%)
-[ RUN      ] matmul.matmul_transpose_sdot_another
-[       OK ] matmul.matmul_transpose_sdot_another (mean 237.796ms, confidence interval +- 0.628446%)
+[ RUN      ] matmul.matmul_sdot_1
+[       OK ] matmul.matmul_sdot_1 (mean 237.796ms, confidence interval +- 0.628446%)
 [==========] 5 benchmarks ran.
 [  PASSED  ] 5 benchmarks.
 
@@ -81,7 +81,7 @@ A       |      |      |   R   |      |      |      |  3 rows
 // A * B = R
 // few algortihms are using transposed B
 // if A and B are not changed between the calls
-// another optimisation is to "pre transpose" once
+// another optimisation is to "pre transpose" it once
 // Ditto
 #define DBJ_MX_ALREADY_TRANSPOSED 1
 
@@ -302,8 +302,11 @@ static void the_most_by_the_book_matrix_mult(
 }
 
 /*
- use 1D aray as matrix type + calculated 1D index of "matrix" [row][col]
+ use 1D aray as matrix type 
+ calculate the 1D index of "matrix" [row][col]
  this is in here because it is curiously and persistently the fastest matmul
+ when ad if no prepocessing is allowed
+ and when matrixes are small-ish
  */
 static dbj_matrix_data_type *matmul_mx_as_array(
 	const size_t a_rows, const size_t a_cols, const size_t b_cols,
@@ -332,8 +335,14 @@ static dbj_matrix_data_type *matmul_mx_as_array(
 }
 
 /* ---------------------------------------------------------------------------- */
-static dbj_matrix_data_type *matmul_mx_as_array_another(const size_t a_rows, const size_t a_cols, const size_t b_cols,
-														dbj_matrix_data_type *a, dbj_matrix_data_type *b, dbj_matrix_data_type *c, dbj_matrix_data_type *bT)
+static dbj_matrix_data_type *matmul_mx_as_array_another(
+	const size_t a_rows,
+	const size_t a_cols,
+	const size_t b_cols,
+	dbj_matrix_data_type *a,
+	dbj_matrix_data_type *b,
+	dbj_matrix_data_type *c,
+	dbj_matrix_data_type *bT)
 {
 	// orinteering
 	// const unsigned b_rows  = a_cols;
@@ -383,7 +392,7 @@ static void *matmul_sdot8(
 	return m;
 }
 
-static void *matmul_transpose_sdot_another(
+static void *matmul_sdot_1(
 	const unsigned a_rows, const unsigned a_cols, const unsigned b_cols,
 	dbj_matrix_data_type a[static a_rows][a_cols],
 	dbj_matrix_data_type b[static a_cols][b_cols],
@@ -504,7 +513,7 @@ static void app_end(void)
 
 UBENCH(matmul, transpose_sdot_another)
 {
-	matmul_transpose_sdot_another(
+	matmul_sdot_1(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 }
@@ -578,7 +587,7 @@ UBENCH(matmul, the_most_by_the_book_matrix_mult)
 UTEST(matmul, transpose_sdot_another)
 {
 	reset_test_result(app_data);
-	matmul_transpose_sdot_another(
+	matmul_sdot_1(
 		DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
 		app_data->a, app_data->b, app_data->r, app_data->bT);
 	check_test_result();
