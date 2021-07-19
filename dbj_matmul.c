@@ -403,7 +403,12 @@ matmul_sdot_1(const unsigned a_rows, const unsigned a_cols,
 /*
 https://raw.githubusercontent.com/ShrohanMohapatra/matrix_multiply_quadratic/master/matrix_multiply_test.py
 
-(c) 20201 by dbj@dbj.org -- transformation to C
+Original Python code by https://github.com/ShrohanMohapatra
+
+Copyright (c) 2019, ShrohanMohapatra
+All rights reserved.
+
+transformation to C -- (c) 20201 by dbj@dbj.org
  */
 
 static void mohapatra(const unsigned Arows, /* == Bcols */

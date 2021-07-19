@@ -1,16 +1,19 @@
 
-# Matrix Multiplication
+# On Matrix Multiplication
 
-Compiled 2021 by dbj at dbj dot org, License https://dbj.org/license_dbj
+Compiled 2021 by dbj at dbj dot org, License https://dbj.org/license_dbj#]
+
 ## The kindergarten method 
 
-Multiplying two-by-two matrices requires eight multiplications, plus some additions. Generally, this way of multiplying two n-by-n matrices together requires n3 multiplications along the way.
+Multiplying two two-by-two matrices requires eight multiplications, plus some additions. Generally, this way of multiplying two n-by-n matrices together requires n3 multiplications along the way.
 
 ![ ](media/matmul.png)
 
 <!-- https://www.quantamagazine.org/mathematicians-inch-closer-to-matrix-multiplication-goal-20210323/ -->
 
 ## Illustration
+
+(Mainly nicked from Wikipedia with thanks)
 
 Result matrix rows == A rows, result cols == B cols
 
@@ -26,10 +29,12 @@ The values at the intersections marked with circles are:
 
 ## C11 and beyond 
 
-The most (modern C) standard matrix multiplication function is this:
+(mostly nicked with thanks from ["Modern C"](https://modernc.gforge.inria.fr/) by one Jens Gustedt.)
+
+The most "by-the-book" standard matrix multiplication function is this:
 
 ```cpp
-void the_most_obvous_matrix_mult 
+void the_most_standard_matrix_mult 
    ( size_t n, size_t k, size_t m,
     double C[n][m] ,
     double A[n][k] ,
@@ -48,21 +53,21 @@ void the_most_obvous_matrix_mult
 One does pass pointers to VLA's into that function. Inside the function, one can use
 conventional indexing to access the elements of the matrices. Above is exactly equivalent to:
 ```cpp
-void the_most_obvous_matrix_mult ( size_t n, size_t k, size_t m,
+void the_most_standard_matrix_mult ( size_t n, size_t k, size_t m,
             double (C[n]) [m] ,
             double (A[n]) [k] ,
             double (B[k]) [m]) ;
 ```
 And the variant with array pointers:
 ```cpp
-void the_most_obvous_matrix_mult ( size_t n, size_t k, size_t m,
+void the_most_standard_matrix_mult ( size_t n, size_t k, size_t m,
             double (*C) [m] ,
             double (*A) [k] ,
             double (*B) [m]) ;
 // The parameter types here are 
 // pointers to 'rows' or matrices
 ```
-### Notes:
+**Notes:**
 
 1. Only the innermost dimension of an array parameter is rewritten by the compiler.
 2. Declare length parameters before array parameters.
@@ -74,7 +79,7 @@ void the_most_obvous_matrix_mult ( size_t n, size_t k, size_t m,
 
 ### The Matrix Multiplication Dimensions  Requirement
 
-Consider matrix multiplication.
+Millions of beginners do regularly stumble on this one. Consider matrix multiplication.
 ```
 A x B = R
 ```
@@ -117,10 +122,10 @@ R rows    == A rows
 R columns == B columns
 ```
 
-Now, let us repeat the "most obvious function" but this time in a very modern C form
+Now, let us repeat the "most obvious function" but this time in a most modern C form:
 
 ```cpp
-void the_most_obvous_matrix_mult 
+void the_most_standard_matrix_mult 
    ( const size_t a_rows, const size_t a_cols, const size_t b_cols,
     double C[static a_rows][b_cols] ,
     double A[static a_rows][a_cols] ,
@@ -136,9 +141,9 @@ void the_most_obvous_matrix_mult
     }
 }
 ```
-"The most obvious function", has arguments arranged so that matrix dimension are enforced, to follow that rule above.
+"The most obvious function", has arguments provided so that matrix dimension are enforced, to follow that dimension related rule above. Argument `b_cols` is not strictly necessary but is added to reduce the amount of inevitable beginners confusion.
 
-Again: be careful to call such a function with properly allocated matrices and properly set dimensions.
+Be careful to call such a function with properly allocated matrices and properly set dimensions.
 ```cpp
 /*
 A rows    == B columns
@@ -154,7 +159,9 @@ int A[a_rows][a_cols] = {{1,2},{3,4},{5,6}} ;
 int B[b_rows][b_cols] = {{1,2,3},{4,5,6}} ;
 int R[r_rows][r_cols] = {{0,0,0},{0,0,0},{0,0,0}} ;
 
-the_most_obvous_matrix_mult(a_rows,a_cols,b_cols) ;
+the_most_standard_matrix_mult(a_rows,a_cols,b_cols,A,B,R) ;
+
+// result is in R
 
 ```
 A bit more descriptive variable names always do help.
