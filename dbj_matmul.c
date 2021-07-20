@@ -24,53 +24,10 @@ GPU's have matmuls "on board" so that is another option; for that see CUDA
  Use this file to recompile and re measure whenever selecting
  the right matrix multiplication algorithm for a new platform
 
- Here is one run on a WIN10 PRO machine, 8GB RAM , and one very old i5 CPU model
-
-[==========] Running 5 benchmarks.
-[ RUN      ] matmul.the_most_by_the_book_matrix_mult
-[       OK ] matmul.the_most_by_the_book_matrix_mult (mean 1.885s, confidence
-interval +- 0.117107%) [ RUN      ] matmul.matmul_mx_as_array [       OK ]
-matmul.matmul_mx_as_array (mean 1.956s, confidence interval +- 0.795940%) [ RUN
-] matmul.matmul_mx_as_array_another [       OK ]
-matmul.matmul_mx_as_array_another (mean 227.829ms, confidence interval +-
-0.472907%) [ RUN      ] matmul.matmul_sdot8 [       OK ] matmul.matmul_sdot8
-(mean 413.246ms, confidence interval +- 0.523624%) [ RUN      ]
-matmul.matmul_sdot_1 [       OK ] matmul.matmul_sdot_1 (mean 237.796ms,
-confidence interval +- 0.628446%)
-[==========] 5 benchmarks ran.
-[  PASSED  ] 5 benchmarks.
-
 OMP. What OMP? OMP might help but on *very* large data sets. Were using GPU is
 much more reasonable anyway. Here is a code you can try on your machine with
 large `DATA_SIZE`: https://godbolt.org/z/fTqTsc5vs
 
-
-Matrix multiplication required dimensions relationship
-
-A(3,2) x B(2,3) = R(3,3)
-                                                          +------+------+------+
-                                                          |      |      |      |
-                                                          |      |      |      |
-                                                          |      |      |      |
-                                                 B    +--------------------+  2
-rows |      |      |      | |      |      |      | |      |      |      |
-                                                          +------+------+------+
-
-                        2 columns              3 columns
-
-                +------+------+       +------+------+------+
-                |      |      |       |      |      |      |
-3 rows  |      |      |       |      |      |      |
-                |      |      |       |      |      |      |
-                +-------------+       +--------------------+
-                |      |      |       |      |      |      |
-A       |      |      |   R   |      |      |      |  3 rows
-                |      |      |       |      |      |      |
-                +-------------+       +--------------------+
-                |      |      |       |      |      |      |
-                |      |      |       |      |      |      |
-                |      |      |       |      |      |      |
-                +------+------+       +------+------+------+
 */
 
 // larger side is  * 2
@@ -85,7 +42,7 @@ A       |      |      |   R   |      |      |      |  3 rows
 #define DBJ_MX_ALREADY_TRANSPOSED 1
 
 // for testing make it 0
-#define DBJ_BENCHMARKING 1
+#define DBJ_BENCHMARKING 0
 // when on godbolt make it 1
 // godbolt times out for even small sizes
 // is is used just to confirm code compiles with no warnings
@@ -97,8 +54,11 @@ A       |      |      |   R   |      |      |      |  3 rows
 
 #define FOR(C, R) for (unsigned C = 0; C < R; ++C)
 
-/* NDEBUG == RELEASE */
+/*
+#ifdef NDEBUG means RELEASE
+*/
 #include <assert.h>
+#include <math.h>
 
 #if (defined(__clang__) || defined(__GNUC__))
 #define DBJ_CLANGNUC 1
@@ -140,7 +100,6 @@ A       |      |      |   R   |      |      |      |  3 rows
 
 #ifdef _MSC_VER
 #pragma endregion // common trash
-
 #pragma region common data
 #endif
 //
@@ -181,6 +140,68 @@ static_assert(DBJ_MX_B_COLS == DBJ_MX_R_COLS, "DBJ_MX_B_COLS != DBJ_MX_R_COLS");
 
 typedef double dbj_matrix_data_type;
 #define dbj_matrix_data_type_name "double"
+
+#ifdef _MSC_VER
+#pragma region compare matrices
+#endif
+
+#undef close_enough_
+// fabs is "generic" macro, good for arythmetic types
+#define close_enough_(a_, b_)                                                  \
+  ((fabs((a_) - (b_)) < 1e-10 * (fabs(a_) + fabs(b_))) ? 1 : 0)
+
+static inline int compare_arrays(const int N, dbj_matrix_data_type a[static N],
+                                 dbj_matrix_data_type b[static N]) {
+  for (unsigned k = 0; k < N; ++k) {
+    // if (!close_enough_(a[k], b[k]))
+    if (a[k] != b[k])
+      return 0;
+  }
+  return 1;
+}
+
+static inline int compare_matrices(const int N, const int M,
+                                   dbj_matrix_data_type a[static N][M],
+                                   dbj_matrix_data_type b[static N][M]) {
+  for (unsigned j = 0; j < N; ++j) {
+    for (unsigned k = 0; k < M; ++k) {
+      // if (!close_enough_(a[j][k], b[j][k]))
+      if (a[j][k] != b[j][k])
+        return 0;
+    }
+  }
+  return 1;
+}
+
+/* be sure A_ and B_ are 2D arrays decayed to pointers */
+/*
+#define compare_arrays(R_, N_, A_, B_) \
+  do { \
+    int retval = 0; \
+    for (unsigned k = 0; k < N_; ++k) { \
+      if (!close_enough_(*A_[k], *B_[k])) { \
+        retval = 0; \
+        goto done_; \
+      } \
+    } \
+    retval = 1; \
+  done_: \
+    R_ = retval; \
+  } while (0)
+*/
+#define print_matrix(F_, R_, C_, M_)                                           \
+  do {                                                                         \
+    printf("\n");                                                              \
+    FOR(j, R_) {                                                               \
+      printf("\n");                                                            \
+      FOR(k, C_) { printf(" " F_ " ", M_[j][k]); }                             \
+    }                                                                          \
+    printf("\n");                                                              \
+  } while (0)
+
+#ifdef _MSC_VER
+#pragma endregion // compare matrices
+#endif
 
 // ubench functions have no parameters
 // thus we use common data aka globals
@@ -241,18 +262,18 @@ dbj_matrix_transpose(const unsigned rows_m, const unsigned cols_m,
   }
 }
 
-inline dbj_matrix_data_type sdot_1(int n,
-                                   const dbj_matrix_data_type x[static n],
-                                   const dbj_matrix_data_type y[static n]) {
+static inline dbj_matrix_data_type
+sdot_1(int n, const dbj_matrix_data_type x[static n],
+       const dbj_matrix_data_type y[static n]) {
   dbj_matrix_data_type s = (dbj_matrix_data_type)0;
   for (int i = 0; i < n; ++i)
     s += x[i] * y[i];
   return s;
 }
 
-inline dbj_matrix_data_type sdot_8(int n,
-                                   const dbj_matrix_data_type x[static n],
-                                   const dbj_matrix_data_type y[static n]) {
+static inline dbj_matrix_data_type
+sdot_8(int n, const dbj_matrix_data_type x[static n],
+       const dbj_matrix_data_type y[static n]) {
   int i, n8 = n >> 3 << 3;
   dbj_matrix_data_type s = (dbj_matrix_data_type)0,
                        t[8] = {(dbj_matrix_data_type)0};
@@ -278,11 +299,10 @@ inline dbj_matrix_data_type sdot_8(int n,
 // "severley optimized" by compilers there is no point investing
 // in finding faster algorithms, including SSE/AVX usage
 // for small matrices of course
-static void the_most_by_the_book_matrix_mult(
-    size_t a_rows, size_t a_cols, size_t b_cols,
-    dbj_matrix_data_type A[static a_rows][a_cols],
-    dbj_matrix_data_type B[static a_cols][b_cols],
-    dbj_matrix_data_type C[static a_rows][b_cols]) {
+static void ijk_matmul(size_t a_rows, size_t a_cols, size_t b_cols,
+                       dbj_matrix_data_type A[static a_rows][a_cols],
+                       dbj_matrix_data_type B[static a_cols][b_cols],
+                       dbj_matrix_data_type C[static a_rows][b_cols]) {
   for (size_t i = 0; i < a_rows; ++i) {
     for (size_t j = 0; j < b_cols; ++j) {
       C[i][j] = 0.0;
@@ -585,9 +605,9 @@ UBENCH(matmul, mx_as_array) {
                      (void *)app_data->r);
 }
 
-UBENCH(matmul, the_most_by_the_book_matrix_mult) {
-  the_most_by_the_book_matrix_mult(DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS,
-                                   app_data->a, app_data->b, app_data->r);
+UBENCH(matmul, ijk_matmul) {
+  ijk_matmul(DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS, app_data->a,
+             app_data->b, app_data->r);
 }
 
 #else // testing /////////////////////////////////////////////////////
@@ -624,11 +644,40 @@ UTEST(matmul, mohapatra) {
   check_test_result();
 }
 
+// check mohapatra one more
+UTEST(matmul, mohapatra_separate_test) {
+  dbj_matrix_data_type a[6][3] = {{1, 2, 3}, {1, 2, 3}, {1, 2, 3},
+                                  {1, 2, 3}, {1, 2, 3}, {1, 2, 3}};
+  dbj_matrix_data_type b[3][6] = {
+      {1, 2, 3, 4, 5, 6}, {1, 2, 3, 4, 5, 6}, {1, 2, 3, 4, 5, 6}};
+  dbj_matrix_data_type r1[6][6] = {0};
+  dbj_matrix_data_type r2[6][6] = {0};
+
+  mohapatra(6, 3, a, b, r1);
+  ijk_matmul(6, 3, 6, a, b, r2);
+  EXPECT_TRUE(compare_matrices(6, 6, r1, r2));
+
+  {
+    printf("\nR1");
+    print_matrix("%4.2f", 6, 6, r1);
+    printf("\nR2");
+    print_matrix("%4.2f", 6, 6, r2);
+    printf("\n");
+  }
+}
+
 UTEST(matmul, transpose_sdot_another) {
   reset_test_result(app_data);
+
   matmul_sdot_1(DBJ_MX_A_ROWS, DBJ_MX_A_COLS, DBJ_MX_B_COLS, app_data->a,
                 app_data->b, app_data->r, app_data->bT);
-  check_test_result();
+
+  dbj_matrix_data_type r1[DBJ_MX_A_ROWS][DBJ_MX_A_ROWS] = {0};
+  ijk_matmul(6, 3, 6, app_data->a, app_data->b, r1);
+
+  EXPECT_TRUE(compare_matrices(DBJ_MX_A_ROWS, DBJ_MX_A_ROWS, r1, app_data->r));
+
+  // check_test_result();
 }
 
 UTEST(matmul, transpose_and_sdot8) {
@@ -654,10 +703,10 @@ UTEST(matmul, mx_as_array) {
   check_test_result();
 }
 
-UTEST(matmul, the_most_by_the_book_matrix_mult) {
+UTEST(matmul, ijk_matmul) {
   reset_test_result(app_data);
-  the_most_by_the_book_matrix_mult(DBJ_MX_A_ROWS, DBJ_MX_B_ROWS, DBJ_MX_A_COLS,
-                                   app_data->a, app_data->b, app_data->r);
+  ijk_matmul(DBJ_MX_A_ROWS, DBJ_MX_B_ROWS, DBJ_MX_A_COLS, app_data->a,
+             app_data->b, app_data->r);
   check_test_result();
 }
 
