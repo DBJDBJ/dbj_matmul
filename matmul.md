@@ -86,12 +86,12 @@ A x B = R
 There are three matrices above: `A`, `B` and `R`. Matrix dimensions for multiplication have to be mutually related as visualised bellow:
 
 ```
-A(3,2) x B(2,3) = R(3,3)
+A(4,2) x B(2,3) = R(4,3)
                               +------+------+------+
                               |      |      |      |
                               |      |      |      |
                               |      |      |      |
-                         B    +--------------------+  2 rows
+A cols == B rows         B    +--------------------+  2 rows
                               |      |      |      |
                               |      |      |      |
                               |      |      |      |
@@ -99,15 +99,19 @@ A(3,2) x B(2,3) = R(3,3)
 
             2 columns              3 columns
 
+        +------+------+       +------+------+------+  R cols == B cols
+        |      |      |       |      |      |      |
+        |      |      |       |      |      |      |  R rows == A rows
+        |      |      |       |      |      |      |
+        +-------------+       +--------------------+
+        |      |      |       |      |      |      |
+A       |      |      |   R   |      |      |      | 
+        |      |      |       |      |      |      |
+        +-------------+       +--------------------+
+        |      |      |       |      |      |      |
+4 rows  |      |      |       |      |      |      |  4 rows
+        |      |      |       |      |      |      |
         +------+------+       +------+------+------+
-        |      |      |       |      |      |      |
-3 rows  |      |      |       |      |      |      |  
-        |      |      |       |      |      |      |
-        +-------------+       +--------------------+
-        |      |      |       |      |      |      |
-A       |      |      |   R   |      |      |      |  3 rows
-        |      |      |       |      |      |      |
-        +-------------+       +--------------------+
         |      |      |       |      |      |      |
         |      |      |       |      |      |      |
         |      |      |       |      |      |      |
@@ -115,49 +119,51 @@ A       |      |      |   R   |      |      |      |  3 rows
 ```
 Thus the dimensional requirement is:
 ```
-A rows    == B columns
+             B cols is unrelated to A
 A columns == B rows
 
 R rows    == A rows
 R columns == B columns
 ```
-
-Now, let us repeat the "most obvious function" but this time in a most modern C form:
+Obviously minimum required dimension to establish the requirement above is:
+```
+A cols, A rows, B cols
+```
+`B rows` and both `R` dimensions are calculated from that input. Now, let us repeat the "most obvious function" but this time in a most modern C form:
 
 ```cpp
 void the_most_standard_matrix_mult 
    ( const size_t a_rows, const size_t a_cols, const size_t b_cols,
-    double C[static a_rows][b_cols] ,
+    double R[static a_rows][b_cols] ,
     double A[static a_rows][a_cols] ,
-    double B[static a_cols][b_cols]) 
+    double B[static a_cols][b_cols])  /* B rows == A cols */
     {
         for ( size_t i = 0; i < a_rows; ++i) {
             for ( size_t j = 0; j < b_cols; ++j) {
-                C[i][j] = 0.0;
+                R[i][j] = 0.0;
             for ( size_t l = 0; l < a_cols; ++l) {
-                C[i][j] += A[i][l]*B[l][j];
+                R[i][j] += A[i][l]*B[l][j];
             }
         }
     }
 }
 ```
-"The most obvious function", has arguments provided so that matrix dimension are enforced, to follow that dimension related rule above. Argument `b_cols` is not strictly necessary but is added to reduce the amount of inevitable beginners confusion.
+"The most obvious function", has arguments provided so that matrix dimension are enforced, to follow that dimension related rule above. 
 
 Be careful to call such a function with properly allocated matrices and properly set dimensions.
 ```cpp
 /*
-A rows    == B columns
 A columns == B rows
 R rows    == A rows
 R columns == B columns
 */
-size_t a_rows = 3, a_cols = 2 ,
-       b_rows = a_cols, b_cols = a_rows ,
-       r_rows = a_rows , r_cols = b_cols l
-
-int A[a_rows][a_cols] = {{1,2},{3,4},{5,6}} ;
-int B[b_rows][b_cols] = {{1,2,3},{4,5,6}} ;
-int R[r_rows][r_cols] = {{0,0,0},{0,0,0},{0,0,0}} ;
+size_t a_rows = 3,      a_cols = 2 , 
+       b_rows = a_cols, b_cols = 4, 
+       r_rows = a_rows, r_cols = b_cols ;
+                                                          // R * C
+int A[a_rows][a_cols] = {{1,2},{3,4},{5,6}} ;             // 3 * 2
+int B[b_rows][b_cols] = {{1,2,3,4},{5,6,7,8},{9,0,1,2}} ; // 3 * 4
+int R[r_rows][r_cols] = {{0,0,0,0},{0,0,0,0},{0,0,0,0}} ; // 3 * 4
 
 the_most_standard_matrix_mult(a_rows,a_cols,b_cols,A,B,R) ;
 
