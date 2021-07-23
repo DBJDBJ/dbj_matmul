@@ -30,9 +30,10 @@ large `DATA_SIZE`: https://godbolt.org/z/fTqTsc5vs
 
 */
 
-// larger side is  * 2
+// A cols is * 2
+// B cols is * 3
 // ignored for testing, for testing see the data used bellow
-#define DBJ_MX_SMALLER_SIDE 256
+#define DBJ_MX_SIDE 256
 
 // A * B = R
 // few algortihms are using transposed B
@@ -103,17 +104,17 @@ large `DATA_SIZE`: https://godbolt.org/z/fTqTsc5vs
 #pragma region common data
 #endif
 //
-// dimensions defintions
+// dimensions values and required relationship
 
 #if DBJ_BENCHMARKING
 
 // NOTE: Be carefull with sizes
 //       UBENCH repeats execution so matrix size is not the prevailing factor
 //       keep them small-ish
-#define DBJ_MX_A_ROWS DBJ_MX_SMALLER_SIDE
-#define DBJ_MX_A_COLS DBJ_MX_SMALLER_SIDE * 2
+#define DBJ_MX_A_ROWS DBJ_MX_SIDE
+#define DBJ_MX_A_COLS DBJ_MX_SIDE * 2
 #define DBJ_MX_B_ROWS DBJ_MX_A_COLS
-#define DBJ_MX_B_COLS DBJ_MX_A_ROWS
+#define DBJ_MX_B_COLS DBJ_MX_SIDE * 3
 
 #else // testing
 /*
@@ -173,22 +174,6 @@ static inline int compare_matrices(const int N, const int M,
   return 1;
 }
 
-/* be sure A_ and B_ are 2D arrays decayed to pointers */
-/*
-#define compare_arrays(R_, N_, A_, B_) \
-  do { \
-    int retval = 0; \
-    for (unsigned k = 0; k < N_; ++k) { \
-      if (!close_enough_(*A_[k], *B_[k])) { \
-        retval = 0; \
-        goto done_; \
-      } \
-    } \
-    retval = 1; \
-  done_: \
-    R_ = retval; \
-  } while (0)
-*/
 #define print_matrix(F_, R_, C_, M_)                                           \
   do {                                                                         \
     printf("\n");                                                              \
@@ -208,11 +193,11 @@ static inline int compare_matrices(const int N, const int M,
 typedef struct app_data_struct {
   unsigned rows_a;
   unsigned cols_a;
-  unsigned rows_b;
+  unsigned rows_b; /* == cols_a */
   unsigned cols_b;
-  unsigned rows_r;
-  unsigned cols_r;
-  // transposed B dimension
+  unsigned rows_r; /* == rows_a */
+  unsigned cols_r; /* == cols_r */
+  // transposed B dimension for some algorithms
   unsigned rows_bT;
   unsigned cols_bT;
   // the matrixes
@@ -324,9 +309,9 @@ static dbj_matrix_data_type *
 matmul_mx_as_array(const size_t a_rows, const size_t a_cols,
                    const size_t b_cols, dbj_matrix_data_type *a,
                    dbj_matrix_data_type *b, dbj_matrix_data_type *c) {
+  const size_t b_rows = a_cols;
   /*
   the matmul dimensional requirements
-  A rows    == B columns
   A columns == B rows
   R rows    == A rows
   R columns == B columns
@@ -334,7 +319,7 @@ matmul_mx_as_array(const size_t a_rows, const size_t a_cols,
   for (size_t i = 0; i < a_rows; i++) {
     for (size_t k = 0; k < b_cols; k++) {
       dbj_matrix_data_type sum = (dbj_matrix_data_type)0.0;
-      for (size_t j = 0; j < a_cols /* same as b rows */; j++) {
+      for (size_t j = 0; j < b_rows; j++) {
         sum += a[i * a_cols + j] * b[j * a_rows + k];
       }
       c[i * a_rows + k] = sum;
@@ -431,13 +416,12 @@ All rights reserved.
 transformation to C -- (c) 20201 by dbj@dbj.org
  */
 
-static void mohapatra(const unsigned Arows, /* == Bcols */
-                      const unsigned Acols, /* == Brows */
-                      double A[Arows][Acols], double B[Acols][Arows],
-                      double E[Arows][Arows]) {
+static void mohapatra(const unsigned Arows, const unsigned Acols, /* == Brows */
+                      const unsigned Bcols, double A[Arows][Acols],
+                      double B[Acols][Bcols], double E[Arows][Bcols]) {
   double maxi = 0;
   FOR(i, Arows)
-  FOR(j, Acols) {
+  FOR(j, Bcols) {
     if (maxi < A[i][j])
       maxi = A[i][j];
     if (maxi < B[i][j])
@@ -463,7 +447,7 @@ static void mohapatra(const unsigned Arows, /* == Bcols */
   }
 
   FOR(i, Arows) {
-    FOR(j, Arows) {
+    FOR(j, Bcols) {
       E[i][j] =
           (int)(C[i] * D[j] / (pow(10, (P * (Arows - 1))))) % (int)(pow(10, P));
     }
